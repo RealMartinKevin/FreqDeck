@@ -1,5 +1,7 @@
 # FreqDeck
 
+**简体中文** | [English](README.en.md)
+
 **Powered by [Freqtrade](https://github.com/freqtrade/freqtrade).**
 
 一个自包含的单体交易控制台：一个进程、一个 bot、一个 Web 界面。不需要 `config.json`，
