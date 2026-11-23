@@ -36,6 +36,38 @@ Ops — single-instance, with no multi-tenant concepts.
 
 ---
 
+## Screenshots
+
+> All screenshots below come from a real `dry_run` (paper-trading) session. They
+> contain no real funds or credentials; secret fields on the Config page show
+> "not configured" and masked values are never echoed back by the UI.
+
+**Dashboard** — runtime mode, bot status, total equity and equity curve
+
+![Dashboard](screenshots/01-dashboard.png)
+
+**Positions** — open position details and P&L summary
+
+![Positions](screenshots/02-positions.png)
+
+**Candle Chart** — pair candles with strategy signal markers
+
+![Candle Chart](screenshots/03-candles.png)
+
+**Analytics** — P&L, win rate, drawdown, tags and daily breakdown
+
+![Analytics](screenshots/04-analytics.png)
+
+**Config** — exchange, secrets (redacted), strategy and runtime settings
+
+![Config](screenshots/05-config.png)
+
+**Ops** — live logs, level filtering and auto-refresh
+
+![Ops](screenshots/06-ops.png)
+
+---
+
 ## Repository layout
 
 ```
@@ -43,6 +75,7 @@ FreqDeck/
 ├── LICENSE            # GPL-3.0 (kept from the repository's initial commit)
 ├── NOTICE             # Copyright and derivative-work notice
 ├── ATTRIBUTION.md     # Upstream baseline + itemized change list
+├── screenshots/       # UI screenshots
 ├── backend/           # freqtrade derivative (source snapshot, no upstream history)
 └── frontend/          # Vue 3 + Vite console
 ```

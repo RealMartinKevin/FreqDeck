@@ -31,6 +31,37 @@
 
 ---
 
+## 界面预览
+
+> 以下均为 `dry_run` 模拟盘下的真实界面截图，不含任何真实资金或凭据；配置页的
+> 密钥字段显示「未配置」，界面不会回显掩码值。
+
+**看板** — 运行模式、Bot 状态、总权益与权益曲线
+
+![看板](screenshots/01-dashboard.png)
+
+**持仓** — 未平仓明细与盈亏汇总
+
+![持仓](screenshots/02-positions.png)
+
+**K 线** — 交易对 K 线与策略信号标记
+
+![K 线](screenshots/03-candles.png)
+
+**统计** — 盈亏、胜率、回撤、标签与日盈亏
+
+![统计](screenshots/04-analytics.png)
+
+**配置** — 交易所、密钥（脱敏）、策略与运行参数
+
+![配置](screenshots/05-config.png)
+
+**运维** — 实时日志、级别过滤与自动刷新
+
+![运维](screenshots/06-ops.png)
+
+---
+
 ## 目录结构
 
 ```
@@ -38,6 +69,7 @@ FreqDeck/
 ├── LICENSE            # GPL-3.0（沿用仓库初始提交）
 ├── NOTICE             # 版权与衍生作品声明
 ├── ATTRIBUTION.md     # 上游基线 + 逐项改动清单
+├── screenshots/       # 界面预览图
 ├── backend/           # freqtrade 衍生版本（源码快照，不含上游历史）
 └── frontend/          # Vue 3 + Vite 控制台
 ```
