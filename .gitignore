@@ -1,0 +1,27 @@
+# 组合仓库的根级忽略。backend/ 与 frontend/ 各自还有自己的 .gitignore。
+# 这里只兜住编辑器、OS 与在两个子目录之外产生的临时产物。
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+.venv/
+
+# Node
+node_modules/
+dist/
+
+# 本地环境覆盖
+.env
+.env.*
+!.env.example
+
+# 编辑器 / OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+*.sw?

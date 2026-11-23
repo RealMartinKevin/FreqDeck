@@ -1,0 +1,379 @@
+/* ---------- 设计令牌 ---------- */
+:root {
+  --bg: #ffffff;
+  --bg-secondary: #f5f5f7;
+  --bg-tertiary: #fafafc;
+  --card: rgba(255, 255, 255, 0.72);
+  --card-solid: #ffffff;
+  --text: #1d1d1f;
+  --text-secondary: #6e6e73;
+  --text-tertiary: #86868b;
+  --accent: #0071e3;
+  --accent-hover: #0077ed;
+  --border: rgba(0, 0, 0, 0.07);
+  --border-strong: rgba(0, 0, 0, 0.12);
+  --up: #0a8f5b;
+  --down: #d92d20;
+  --warn: #b25e00;
+  --radius-card: 18px;
+  --radius-inner: 12px;
+  --radius-pill: 980px;
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 28px rgba(0, 0, 0, 0.05);
+  --shadow-card-hover: 0 2px 6px rgba(0, 0, 0, 0.05), 0 18px 44px rgba(0, 0, 0, 0.09);
+  --shadow-pop: 0 12px 40px rgba(0, 0, 0, 0.14), 0 2px 8px rgba(0, 0, 0, 0.06);
+  --highlight: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 48px;
+  --space-2xl: 72px;
+  --ease: cubic-bezier(0.25, 0.1, 0.25, 1);
+
+  /* 多实例净值曲线色板：蓝/靛/紫/品红/青/金，刻意避开绿(~150°)与红(~0°)色相，
+     否则曲线颜色会被读成涨跌（绿涨红跌是本项目铁律） */
+  --chart-1: #0071e3;
+  --chart-2: #4b4fd1;
+  --chart-3: #8b3fc9;
+  --chart-4: #c0399e;
+  --chart-5: #0d9bb8;
+  --chart-6: #9a7500;
+
+  /* 层级具名化：看板 topbar=30、表格 sticky 表头=20、Modal=100 是三页共用的既定顺序 */
+  --z-sticky-head: 20;
+  --z-topbar: 30;
+  --z-modal: 100;
+
+  /* 表格 sticky 首列的竖向渐隐投影：随 --text 派生，深色主题自动变成亮描边，无需两套 */
+  --shadow-col: 12px 0 16px -12px color-mix(in srgb, var(--text) 28%, transparent);
+  color-scheme: light;
+}
+
+/* 深色档位单独定义：阴影在纯黑底上不可见，改用更亮的描边与发光来分层 */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --bg: #000000;
+    --bg-secondary: #1d1d1f;
+    --bg-tertiary: #0a0a0b;
+    --card: rgba(28, 28, 30, 0.72);
+    --card-solid: #1d1d1f;
+    --text: #f5f5f7;
+    --text-secondary: #a1a1a6;
+    --text-tertiary: #86868b;
+    --border: rgba(255, 255, 255, 0.1);
+    --border-strong: rgba(255, 255, 255, 0.18);
+    --up: #30d158;
+    --down: #ff453a;
+    --warn: #ff9f0a;
+    --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 12px 32px rgba(0, 0, 0, 0.6);
+    --shadow-card-hover: 0 1px 0 rgba(255, 255, 255, 0.06) inset, 0 20px 48px rgba(0, 0, 0, 0.7);
+    --shadow-pop: 0 20px 56px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.08);
+    --highlight: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    /* 深色底上提亮曲线色，与 light 档同色相换明度，图例顺序不变 */
+    --chart-1: #4da3ff;
+    --chart-2: #8f9cff;
+    --chart-3: #c07cff;
+    --chart-4: #ff6fd0;
+    --chart-5: #35c8e8;
+    --chart-6: #e0b400;
+    color-scheme: dark;
+  }
+}
+
+/* 手动切换优先级高于系统，属性选择器特异性更高，无需依赖顺序 */
+:root[data-theme='light'] {
+  --bg: #ffffff;
+  --bg-secondary: #f5f5f7;
+  --bg-tertiary: #fafafc;
+  --card: rgba(255, 255, 255, 0.72);
+  --card-solid: #ffffff;
+  --text: #1d1d1f;
+  --text-secondary: #6e6e73;
+  --text-tertiary: #86868b;
+  --accent: #0071e3;
+  --accent-hover: #0077ed;
+  --border: rgba(0, 0, 0, 0.07);
+  --border-strong: rgba(0, 0, 0, 0.12);
+  --up: #0a8f5b;
+  --down: #d92d20;
+  --warn: #b25e00;
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 28px rgba(0, 0, 0, 0.05);
+  --shadow-card-hover: 0 2px 6px rgba(0, 0, 0, 0.05), 0 18px 44px rgba(0, 0, 0, 0.09);
+  --shadow-pop: 0 12px 40px rgba(0, 0, 0, 0.14), 0 2px 8px rgba(0, 0, 0, 0.06);
+  --highlight: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  --chart-1: #0071e3;
+  --chart-2: #4b4fd1;
+  --chart-3: #8b3fc9;
+  --chart-4: #c0399e;
+  --chart-5: #0d9bb8;
+  --chart-6: #9a7500;
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  --bg: #000000;
+  --bg-secondary: #1d1d1f;
+  --bg-tertiary: #0a0a0b;
+  --card: rgba(28, 28, 30, 0.72);
+  --card-solid: #1d1d1f;
+  --text: #f5f5f7;
+  --text-secondary: #a1a1a6;
+  --text-tertiary: #86868b;
+  --border: rgba(255, 255, 255, 0.1);
+  --border-strong: rgba(255, 255, 255, 0.18);
+  --up: #30d158;
+  --down: #ff453a;
+  --warn: #ff9f0a;
+  --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 12px 32px rgba(0, 0, 0, 0.6);
+  --shadow-card-hover: 0 1px 0 rgba(255, 255, 255, 0.06) inset, 0 20px 48px rgba(0, 0, 0, 0.7);
+  --shadow-pop: 0 20px 56px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.08);
+  --highlight: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --chart-1: #4da3ff;
+  --chart-2: #8f9cff;
+  --chart-3: #c07cff;
+  --chart-4: #ff6fd0;
+  --chart-5: #35c8e8;
+  --chart-6: #e0b400;
+  color-scheme: dark;
+}
+
+/* ---------- 基础 ---------- */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Segoe UI',
+    'PingFang SC', 'Microsoft YaHei', sans-serif;
+  font-size: 17px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  transition: background-color 0.3s var(--ease), color 0.3s var(--ease);
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+/* 金额必须等宽，否则多实例纵向对比会错位 */
+.num {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+  letter-spacing: -0.01em;
+}
+
+.up {
+  color: var(--up);
+}
+
+.down {
+  color: var(--down);
+}
+
+.muted {
+  color: var(--text-tertiary);
+}
+
+/* ---------- 复用件 ---------- */
+.card {
+  position: relative;
+  background: var(--card);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card), var(--highlight);
+  transition: box-shadow 0.35s var(--ease), transform 0.35s var(--ease),
+    border-color 0.35s var(--ease);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  min-height: 44px;
+  padding: 12px 24px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  transition: transform 0.22s var(--ease), background-color 0.22s var(--ease),
+    box-shadow 0.22s var(--ease), opacity 0.22s var(--ease);
+  white-space: nowrap;
+}
+
+.btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+  transform: none;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: #ffffff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12), 0 6px 18px rgba(0, 113, 227, 0.28);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+  transform: translateY(-1px);
+}
+
+.btn-secondary {
+  background: color-mix(in srgb, var(--text) 4%, transparent);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+  border-color: var(--border-strong);
+}
+
+.btn-danger {
+  background: var(--down);
+  color: #ffffff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12), 0 6px 18px color-mix(in srgb, var(--down) 32%, transparent);
+}
+
+.btn-danger:hover:not(:disabled) {
+  filter: brightness(1.06);
+  transform: translateY(-1px);
+}
+
+.btn-sm {
+  min-height: 36px;
+  padding: 8px 18px;
+  font-size: 13px;
+}
+
+.input {
+  width: 100%;
+  min-height: 44px;
+  padding: 11px 14px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-inner);
+  background: var(--bg-secondary);
+  color: var(--text);
+  font: inherit;
+  font-size: 15px;
+  outline: none;
+  transition: border-color 0.2s var(--ease), box-shadow 0.2s var(--ease),
+    background-color 0.2s var(--ease);
+}
+
+.input::placeholder {
+  color: var(--text-tertiary);
+}
+
+.input:hover {
+  background: color-mix(in srgb, var(--text) 6%, var(--bg-secondary));
+}
+
+.input:focus {
+  background: var(--card-solid);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+.label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.hint {
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-tertiary);
+}
+
+/* 分组标题：小字号 + 字距放开，作为纵向分隔而非视觉主体 */
+.eyebrow {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.fade-up {
+  animation: fadeUp 0.5s var(--ease) both;
+}
+
+@keyframes shimmer {
+  from {
+    background-position: -200px 0;
+  }
+  to {
+    background-position: calc(200px + 100%) 0;
+  }
+}
+
+.skeleton {
+  border-radius: 8px;
+  background: linear-gradient(
+    90deg,
+    var(--bg-secondary) 0%,
+    color-mix(in srgb, var(--text) 8%, var(--bg-secondary)) 50%,
+    var(--bg-secondary) 100%
+  );
+  background-size: 200px 100%;
+  background-repeat: no-repeat;
+  animation: shimmer 1.4s infinite linear;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

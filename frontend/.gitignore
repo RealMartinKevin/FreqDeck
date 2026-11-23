@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+
+# Build output — produced by `npm run build`, served by freqtrade via app.ui_path.
+# Never commit it: the directory is a derived artifact and would go stale silently.
+dist/
+dist-ssr/
+
+# One-off probe scripts used while verifying API response shapes against a live
+# backend. Scratch material, not part of the product.
+.probe/
+
+# Local env overrides
+*.local
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Editors / OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

@@ -1,0 +1,37 @@
+FreqDeck
+Copyright (C) 2026 FreqDeck contributors
+
+This program is free software: you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free Software
+Foundation, either version 3 of the License, or (at your option) any later
+version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE. See the GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along with
+this program. If not, see <https://www.gnu.org/licenses/>.
+
+--------------------------------------------------------------------------------
+Upstream attribution
+
+FreqDeck is a derivative work of freqtrade:
+    https://github.com/freqtrade/freqtrade
+
+freqtrade is Copyright (C) the freqtrade contributors and is distributed under
+the GNU General Public License version 3. The upstream license text is retained
+verbatim at backend/LICENSE.
+
+The `backend/` directory contains a modified copy of freqtrade based on the
+`stable` tag 2026.10 (upstream commit 4cf0351e0). All modifications made for
+FreqDeck are enumerated in ATTRIBUTION.md. The upstream commit history is not
+included in this repository; the original `origin` remote is kept in the
+development clone so upstream changes can still be fetched and merged.
+
+The `frontend/` directory is an independent Vue 3 application that consumes
+freqtrade's REST API. It does not incorporate freqtrade source code. It is
+distributed under the same GPL-3.0 license as the combined work.
+
+The user interface displays a "Powered by Freqtrade" attribution linking to the
+upstream project on every route.

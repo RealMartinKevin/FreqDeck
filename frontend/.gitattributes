@@ -1,0 +1,14 @@
+# Store text as LF in the repository regardless of the committer's platform.
+# The worktree still follows the local `core.autocrlf` setting, so Windows
+# checkouts stay CRLF without polluting diffs.
+* text=auto
+
+# Explicit binary guards — these must never be line-ending converted.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.woff binary
+*.woff2 binary
