@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { t } from '../i18n'
+
 /**
  * 配置页的分组卡片：锚点 id + 组级错误挂载点。
  *
@@ -24,12 +26,12 @@ const props = defineProps<{
     <header class="head">
       <div class="titles">
         <h2 class="title">
-          {{ props.title }}
-          <span v-if="(props.dirtyCount ?? 0) > 0" class="count" :title="`${props.dirtyCount} 项未保存`">
+          {{ t(props.title) }}
+          <span v-if="(props.dirtyCount ?? 0) > 0" class="count" :title="t('{n} 项未保存', { n: props.dirtyCount ?? 0 })">
             {{ props.dirtyCount }}
           </span>
         </h2>
-        <p v-if="props.desc" class="desc">{{ props.desc }}</p>
+        <p v-if="props.desc" class="desc">{{ t(props.desc) }}</p>
       </div>
     </header>
 

@@ -12,6 +12,7 @@
  *   未配置时后端回的是空串（不是掩码），所以「有值」要同时排除 `''` 与掩码。
  */
 
+import { t } from '../i18n'
 import { computed, ref, watch } from 'vue'
 import { isRedacted } from '../api/ft/normalize'
 
@@ -43,10 +44,10 @@ const hasPlain = computed(() => text.value !== '' && !isRedacted(text.value))
 const clearable = computed(() => CLEARABLE.has(props.path) && (configured.value || hasPlain.value))
 
 const stateLabel = computed(() => {
-  if (props.replaced && hasPlain.value) return '已填入新值（保存后生效）'
-  if (configured.value) return '已配置'
-  if (hasPlain.value) return '已填入新值（保存后生效）'
-  return '未配置'
+  if (props.replaced && hasPlain.value) return t('已填入新值（保存后生效）')
+  if (configured.value) return t('已配置')
+  if (hasPlain.value) return t('已填入新值（保存后生效）')
+  return t('未配置')
 })
 
 const stateTone = computed(() => {
@@ -92,7 +93,7 @@ function clear(): void {
 <template>
   <div class="field" :class="{ invalid: !!props.error }">
     <div class="row">
-      <span class="label">{{ props.label }}</span>
+      <span class="label">{{ t(props.label) }}</span>
       <span class="state" :class="`t-${stateTone}`">
         <i class="dot" aria-hidden="true" />
         {{ stateLabel }}
@@ -106,20 +107,20 @@ function clear(): void {
         :type="'text'"
         autocomplete="off"
         spellcheck="false"
-        :placeholder="`新的${props.label}`"
+        :placeholder="t('新的{label}', { label: t(props.label) })"
         @keydown.enter.prevent="commit"
         @keydown.esc.prevent="cancelEdit"
       />
-      <button class="btn btn-primary btn-sm" type="button" :disabled="!typed.trim()" @click="commit">确定</button>
-      <button class="btn btn-secondary btn-sm" type="button" @click="cancelEdit">取消</button>
+      <button class="btn btn-primary btn-sm" type="button" :disabled="!typed.trim()" @click="commit">{{ t('确定') }}</button>
+      <button class="btn btn-secondary btn-sm" type="button" @click="cancelEdit">{{ t('取消') }}</button>
     </div>
 
     <div v-else class="actions">
       <button class="btn btn-secondary btn-sm" type="button" @click="startEdit">
-        {{ configured ? '更换' : '设置' }}
+        {{ configured ? t('更换') : t('设置') }}
       </button>
-      <button v-if="clearable" class="btn btn-secondary btn-sm" type="button" @click="clear">清除</button>
-      <span v-if="props.hint" class="hint">{{ props.hint }}</span>
+      <button v-if="clearable" class="btn btn-secondary btn-sm" type="button" @click="clear">{{ t('清除') }}</button>
+      <span v-if="props.hint" class="hint">{{ t(props.hint) }}</span>
     </div>
 
     <p v-if="props.error" class="err">{{ props.error }}</p>

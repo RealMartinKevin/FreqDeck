@@ -100,7 +100,13 @@ export async function fetchOverview(options: SnapshotOptions = {}): Promise<Over
     daily: daily.value === null ? null : mapDailyPoints(daily.value.data ?? null),
     apiState: apiStateOf(info.failure ?? unauthorized),
     // 主端点全失败才给整页错误；单个端点失败由对应字段的 null 表达
-    error: allPrimaryFailed ? { kind: primaryFailures[0]?.kind ?? 'server_error', detail: primaryFailures[0]?.detail ?? '' } : null,
+    error: allPrimaryFailed
+      ? {
+          kind: primaryFailures[0]?.kind ?? 'server_error',
+          detail: primaryFailures[0]?.detail ?? '',
+          status: primaryFailures[0]?.status ?? null,
+        }
+      : null,
   })
 
   return {
@@ -147,6 +153,7 @@ export async function fetchPositionsOpen(options: SnapshotOptions = {}): Promise
     // 观察模式下 `/status` 会抛 not_ready（业务态，不是故障）：把它表达成 available 枚举，
     // 而不是用 reason 含糊带过——页面的空态文案是照着这个枚举写的。
     reason: reasonOf(status),
+    status: status.failure?.status ?? null,
   }
 
   return {

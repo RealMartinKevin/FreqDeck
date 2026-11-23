@@ -308,7 +308,7 @@ export interface OverviewParts {
   daily: DailyPoint[] | null
   apiState: ApiState
   /** 主端点全失败才有值 */
-  error: { kind: string; detail: string } | null
+  error: { kind: string; detail: string; status?: number | null } | null
 }
 
 export function mapInstanceOverview(parts: OverviewParts): InstanceOverview {

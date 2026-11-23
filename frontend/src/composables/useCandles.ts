@@ -39,6 +39,7 @@ export function useCandles() {
     } catch (e) {
       // 保留上一份 meta：一次网络抖动不该把白名单和已经画出来的图一起清掉
       error.value = message(e)
+      errorStatus.value = e instanceof ApiError ? e.status : null
     } finally {
       metaLoading.value = false
     }

@@ -11,7 +11,8 @@
  */
 
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
-import { ApiFailure, CONFIG_GROUPS, FIELDS, changePassword, restartProcess } from '../api/client'
+import { ApiFailure, CONFIG_GROUPS, FIELDS, changePassword, errorDetailText, restartProcess } from '../api/client'
+import type { ErrorDetailSource } from '../api/client'
 import type { ConfigFieldSpec } from '../api/types'
 import ConfigField from '../components/ConfigField.vue'
 import ConfigGroup from '../components/ConfigGroup.vue'
@@ -19,6 +20,7 @@ import ModeBadge from '../components/ModeBadge.vue'
 import StatePanel from '../components/StatePanel.vue'
 import TopBar from '../components/TopBar.vue'
 import { useConfigForm } from '../composables/useConfigForm'
+import { t } from '../i18n'
 
 const {
   loading,
@@ -171,28 +173,28 @@ const pwdNew = ref('')
 const pwdConfirm = ref('')
 const pwdBusy = ref(false)
 const pwdMessage = ref<string | null>(null)
-const pwdError = ref<string | null>(null)
+const pwdError = ref<ErrorDetailSource>(null)
 
 async function submitPassword(): Promise<void> {
   if (pwdBusy.value) return
   pwdMessage.value = null
   pwdError.value = null
   if (pwdNew.value.length < 8) {
-    pwdError.value = '新密码至少 8 位'
+    pwdError.value = t('新密码至少 {n} 位', { n: 8 })
     return
   }
   if (pwdNew.value !== pwdConfirm.value) {
-    pwdError.value = '两次输入的新密码不一致'
+    pwdError.value = t('两次输入的新密码不一致')
     return
   }
   pwdBusy.value = true
   try {
     const ack = await changePassword(pwdCurrent.value, pwdNew.value)
     if (ack.accepted !== true) {
-      pwdError.value = ack.message || '后端拒绝修改密码'
+      pwdError.value = ack.message || t('后端拒绝修改密码')
       return
     }
-    pwdMessage.value = '密码已修改。当前会话仍然有效，下次登录请使用新密码。'
+    pwdMessage.value = t('密码已修改。当前会话仍然有效，下次登录请使用新密码。')
     pwdCurrent.value = ''
     pwdNew.value = ''
     pwdConfirm.value = ''
@@ -201,9 +203,11 @@ async function submitPassword(): Promise<void> {
       // 这个端点的 401/403 只可能是「当前密码不对」（后端 `compare_digest` 失败 → 403），
       // 所以翻译成人话，但把后端原文一并留在括号里——不吞掉能拿去搜索的字。
       pwdError.value =
-        error.status === 401 || error.status === 403 ? `当前密码不正确（${error.detail}）` : error.detail
+        error.status === 401 || error.status === 403
+          ? t('当前密码不正确（{detail}）', { detail: errorDetailText(error) })
+          : error
     } else {
-      pwdError.value = '修改密码失败'
+      pwdError.value = t('修改密码失败')
     }
   } finally {
     pwdBusy.value = false
@@ -268,8 +272,8 @@ onBeforeUnmount(() => {
     <TopBar />
 
     <div class="shell">
-      <aside class="side" aria-label="配置分组">
-        <p class="side-title">配置</p>
+      <aside class="side" :aria-label="t('配置分组')">
+        <p class="side-title">{{ t('配置') }}</p>
         <button
           v-for="anchor in anchors"
           :key="anchor.id"
@@ -279,23 +283,23 @@ onBeforeUnmount(() => {
           @click="scrollTo(anchor.id)"
         >
           <span class="anchor-dot" aria-hidden="true" />
-          {{ anchor.title }}
-          <span v-if="groupErrors[anchor.id]" class="anchor-bad" title="该组有后端返回的错误">!</span>
+          {{ t(anchor.title) }}
+          <span v-if="groupErrors[anchor.id]" class="anchor-bad" :title="t('该组有后端返回的错误')">!</span>
         </button>
       </aside>
 
       <main class="content">
-        <StatePanel v-if="loading && !ready" variant="block" tone="muted" title="正在读取配置…" />
+        <StatePanel v-if="loading && !ready" variant="block" tone="muted" :title="t('正在读取配置…')" />
 
         <StatePanel
           v-else-if="loadError"
           variant="block"
           tone="error"
-          title="读取配置失败"
-          action="重试"
+          :title="t('读取配置失败')"
+          :action="t('重试')"
           @action="load"
         >
-          {{ loadError }}
+          {{ errorDetailText(loadError) }}
         </StatePanel>
 
         <template v-else>
@@ -304,7 +308,7 @@ onBeforeUnmount(() => {
             <div class="mode-row">
               <ModeBadge />
               <p class="mode-hint">
-                观察模式下只跑 API 与界面，不加载策略与交易所：这时保存的策略/交易所类配置会被记为「切到交易模式后生效」。
+                {{ t('观察模式下只跑 API 与界面，不加载策略与交易所：这时保存的策略/交易所类配置会被记为「切到交易模式后生效」。') }}
               </p>
             </div>
           </ConfigGroup>
@@ -334,30 +338,30 @@ onBeforeUnmount(() => {
 
             <!-- 安全组追加「修改登录密码」：走 /app/password，会校验当前密码 -->
             <div v-if="group.id === 'security'" class="pwd">
-              <p class="pwd-title">修改登录密码</p>
+              <p class="pwd-title">{{ t('修改登录密码') }}</p>
               <p class="pwd-desc">
-                与上面「登录密码」字段的区别：这里会**校验当前密码**，忘了旧密码就没法改——防止会话被劫持后直接换密码。
+                {{ t('与上面「登录密码」字段的区别：这里会**校验当前密码**，忘了旧密码就没法改——防止会话被劫持后直接换密码。') }}
               </p>
               <div class="pwd-grid">
                 <label class="pwd-cell">
-                  <span class="pwd-label">当前密码</span>
+                  <span class="pwd-label">{{ t('当前密码') }}</span>
                   <input v-model="pwdCurrent" class="input" type="password" autocomplete="current-password" />
                 </label>
                 <label class="pwd-cell">
-                  <span class="pwd-label">新密码（≥ 8 位）</span>
+                  <span class="pwd-label">{{ t('新密码（≥ 8 位）') }}</span>
                   <input v-model="pwdNew" class="input" type="password" autocomplete="new-password" />
                 </label>
                 <label class="pwd-cell">
-                  <span class="pwd-label">确认新密码</span>
+                  <span class="pwd-label">{{ t('确认新密码') }}</span>
                   <input v-model="pwdConfirm" class="input" type="password" autocomplete="new-password" />
                 </label>
               </div>
               <div class="pwd-actions">
                 <button class="btn btn-secondary btn-sm" type="button" :disabled="pwdBusy" @click="submitPassword">
-                  {{ pwdBusy ? '提交中…' : '修改密码' }}
+                  {{ pwdBusy ? t('提交中…') : t('修改密码') }}
                 </button>
                 <span v-if="pwdMessage" class="pwd-ok">{{ pwdMessage }}</span>
-                <span v-if="pwdError" class="pwd-err">{{ pwdError }}</span>
+                <span v-if="pwdError" class="pwd-err">{{ errorDetailText(pwdError) }}</span>
               </div>
             </div>
           </ConfigGroup>
@@ -370,9 +374,9 @@ onBeforeUnmount(() => {
           >
             <div class="json-actions">
               <button class="btn btn-secondary btn-sm" type="button" @click="copyJson">
-                {{ jsonCopied ? '已复制' : '复制 JSON' }}
+                {{ jsonCopied ? t('已复制') : t('复制 JSON') }}
               </button>
-              <span class="json-note">含未保存的改动</span>
+              <span class="json-note">{{ t('含未保存的改动') }}</span>
             </div>
             <pre class="json">{{ jsonText }}</pre>
           </ConfigGroup>
@@ -384,18 +388,18 @@ onBeforeUnmount(() => {
     <div v-if="ready" class="dock">
       <div v-if="result" class="result" :class="`r-${result.kind}`">
         <div class="result-main">
-          <p class="result-title">{{ result.title }}</p>
+          <p class="result-title">{{ t(result.title) }}</p>
           <p v-if="result.changed.length" class="result-sub">
-            后端确认变更 {{ result.changed.length }} 项：{{ result.changed.join('、') }}
+            {{ t('后端确认变更 {n} 项：{list}', { n: result.changed.length, list: result.changed.join('、') }) }}
           </p>
           <pre v-if="result.detail" class="result-raw">{{ result.detail }}</pre>
           <p v-if="result.kind === 'shell_mode'" class="result-sub">
-            保存不会自己切模式，需要你手动切一次。
+            {{ t('保存不会自己切模式，需要你手动切一次。') }}
           </p>
         </div>
         <div class="result-actions">
           <button v-if="result.kind === 'shell_mode'" class="btn btn-primary btn-sm" type="button" @click="scrollTo('mode')">
-            切换模式
+            {{ t('切换模式') }}
           </button>
           <button
             v-if="result.kind === 'reload_pending' || result.kind === 'reload_failed'"
@@ -403,9 +407,9 @@ onBeforeUnmount(() => {
             type="button"
             @click="restartConfirm = true"
           >
-            立即重启
+            {{ t('立即重启') }}
           </button>
-          <button class="btn btn-secondary btn-sm" type="button" @click="dismissResult">知道了</button>
+          <button class="btn btn-secondary btn-sm" type="button" @click="dismissResult">{{ t('知道了') }}</button>
         </div>
       </div>
 
@@ -413,16 +417,16 @@ onBeforeUnmount(() => {
 
       <div class="bar">
         <span class="bar-state">
-          <template v-if="!hasChanges">没有未保存的改动</template>
-          <template v-else>未保存 {{ dirtyCount }} 项</template>
-          <span v-if="mode === 'shell'" class="bar-mode">当前是观察模式</span>
+          <template v-if="!hasChanges">{{ t('没有未保存的改动') }}</template>
+          <template v-else>{{ t('未保存 {n} 项', { n: dirtyCount }) }}</template>
+          <span v-if="mode === 'shell'" class="bar-mode">{{ t('当前是观察模式') }}</span>
         </span>
         <div class="bar-actions">
           <button class="btn btn-secondary btn-sm" type="button" :disabled="!hasChanges || saving" @click="onDiscard">
-            放弃
+            {{ t('放弃') }}
           </button>
           <button class="btn btn-primary btn-sm" type="button" :disabled="!hasChanges || saving" @click="requestSave">
-            {{ saving ? '保存中…' : '保存' }}
+            {{ saving ? t('保存中…') : t('保存') }}
           </button>
         </div>
       </div>
@@ -432,19 +436,19 @@ onBeforeUnmount(() => {
     <Teleport to="body">
       <div v-if="confirmRestart" class="overlay" @click.self="confirmRestart = false">
         <div class="dialog" role="dialog" aria-modal="true">
-          <h2 class="dialog-title">这些改动需要重启进程</h2>
+          <h2 class="dialog-title">{{ t('这些改动需要重启进程') }}</h2>
           <p class="dialog-lead">
-            下面的字段不会热载，保存后仍然用旧值，直到进程重启：
+            {{ t('下面的字段不会热载，保存后仍然用旧值，直到进程重启：') }}
           </p>
           <ul class="dialog-list">
             <li v-for="path in pendingRestartFor" :key="path">{{ path }}</li>
           </ul>
           <p class="dialog-lead warn">
-            改监听地址或端口时请注意：重启后要用**新地址**访问本页面，旧地址会连不上。
+            {{ t('改监听地址或端口时请注意：重启后要用**新地址**访问本页面，旧地址会连不上。') }}
           </p>
           <div class="dialog-actions">
-            <button class="btn btn-secondary" type="button" @click="confirmRestart = false">取消</button>
-            <button class="btn btn-primary" type="button" @click="commit">仍然保存</button>
+            <button class="btn btn-secondary" type="button" @click="confirmRestart = false">{{ t('取消') }}</button>
+            <button class="btn btn-primary" type="button" @click="commit">{{ t('仍然保存') }}</button>
           </div>
         </div>
       </div>
@@ -454,14 +458,14 @@ onBeforeUnmount(() => {
     <Teleport to="body">
       <div v-if="restartConfirm" class="overlay" @click.self="restartConfirm = false">
         <div class="dialog" role="dialog" aria-modal="true">
-          <h2 class="dialog-title">重启进程？</h2>
+          <h2 class="dialog-title">{{ t('重启进程？') }}</h2>
           <p class="dialog-lead">
-            重启期间（约 5–15 秒）页面会短暂失去连接，这是正常过程；已有持仓不会被平掉。
+            {{ t('重启期间（约 5–15 秒）页面会短暂失去连接，这是正常过程；已有持仓不会被平掉。') }}
           </p>
           <div class="dialog-actions">
-            <button class="btn btn-secondary" type="button" @click="restartConfirm = false">取消</button>
+            <button class="btn btn-secondary" type="button" @click="restartConfirm = false">{{ t('取消') }}</button>
             <button class="btn btn-danger" type="button" :disabled="restarting" @click="doRestart">
-              {{ restarting ? '重启中…' : '立即重启' }}
+              {{ restarting ? t('重启中…') : t('立即重启') }}
             </button>
           </div>
         </div>

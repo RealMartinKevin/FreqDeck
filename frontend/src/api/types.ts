@@ -12,7 +12,7 @@ export interface ActionResult {
   command?: string[]
   path?: string
   status?: { unit: string; active_state: string; sub_state: string; main_pid: number | null; process_state: ProcessState } | null
-  error?: { kind: string; detail: string } | null
+  error?: { kind: string; detail: string; status?: number | null } | null
 }
 
 export interface InstanceOut {
@@ -103,7 +103,7 @@ export interface InstanceOverview {
   today: { date: string; abs_profit: number; trade_count: number } | null
   data_age_seconds: number | null
   from_snapshot: boolean
-  error: { kind: string; detail: string } | null
+  error: { kind: string; detail: string; status?: number | null } | null
   /** 胜率百分数（62.5 = 62.5%）；快照实例不写胜率 → null，显示「—」而不是 0 */
   winrate_pct: number | null
   /** 已平仓笔数，胜率合计按它加权 */
@@ -155,7 +155,7 @@ export interface ProvisionResult {
   unit_name: string
   unit_content?: string
   unit_path?: string
-  error?: { kind: string; detail: string } | null
+  error?: { kind: string; detail: string; status?: number | null } | null
 }
 
 /* ------------------------------------------------------------------ *
@@ -265,7 +265,7 @@ export interface PositionActionResult {
   ok: boolean
   /** 成功时的补充说明（如「成交结果下一次刷新反映」） */
   detail?: string
-  error?: { kind: string; detail: string } | null
+  error?: { kind: string; detail: string; status?: number | null } | null
 }
 
 export interface InstanceAvailability {
@@ -277,6 +277,8 @@ export interface InstanceAvailability {
    */
   available: 'ok' | 'api_unreachable' | 'unauthorized' | 'timeout' | 'not_ready' | 'unknown'
   reason: string | null
+  /** reason 来自带 HTTP 状态的失败时携带 status，供渲染处把 {n} 替换为真实码 */
+  status?: number | null
 }
 
 export interface PositionsOut {
@@ -386,6 +388,8 @@ export interface LogsOut {
   instance_name: string
   available: ObserveAvailability
   reason: string | null
+  /** reason 来自带 HTTP 状态的失败时携带 status，供渲染处把 {n} 替换为真实码 */
+  status?: number | null
   kind?: string
   lines: LogLine[]
   /** 过滤前的缓冲区总行数；用于显示「已筛出 N / 共 M 行」 */
@@ -399,6 +403,8 @@ export interface ObserveBase {
   instance_name: string
   available: ObserveAvailability
   reason: string | null
+  /** reason 来自带 HTTP 状态的失败时携带 status，供渲染处把 {n} 替换为真实码 */
+  status?: number | null
   kind?: string
 }
 
@@ -629,6 +635,8 @@ export interface AnalyticsOut {
   instance_name: string
   available: ObserveAvailability
   reason: string | null
+  /** reason 来自带 HTTP 状态的失败时携带 status，供渲染处把 {n} 替换为真实码 */
+  status?: number | null
   days: number
   weeks: number
   months: number

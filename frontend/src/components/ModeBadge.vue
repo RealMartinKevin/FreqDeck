@@ -9,6 +9,7 @@
  * 用户能改变的只有「模式」；说成启停开关必然引出「我点了启动但没在交易」的疑问。
  */
 
+import { t } from '../i18n'
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAppMode } from '../composables/useAppMode'
@@ -19,7 +20,7 @@ const router = useRouter()
 
 const open = ref(false)
 
-const hint = computed(() => (badge.value.tone === 'muted' ? '点击切换模式' : badge.value.title))
+const hint = computed(() => (badge.value.tone === 'muted' ? t('点击切换模式') : badge.value.title))
 
 function onClose() {
   open.value = false

@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { UnauthorizedError, api, fetchConfig, getAtPath, normalizeTimeframe } from '../api/client'
+import { UnauthorizedError, api, errorDetailText, fetchConfig, getAtPath, normalizeTimeframe } from '../api/client'
+import { ApiFailure } from '../api/client'
+import type { ErrorDetailSource } from '../api/client'
 import type { ChartMarker } from '../api/types'
 import { useAppMode } from '../composables/useAppMode'
 import { useCandles } from '../composables/useCandles'
@@ -13,6 +15,7 @@ import ChartScopeBar from '../components/ChartScopeBar.vue'
 import ModeSwitchDialog from '../components/ModeSwitchDialog.vue'
 import StatePanel from '../components/StatePanel.vue'
 import TopBar from '../components/TopBar.vue'
+import { t } from '../i18n'
 
 const route = useRoute()
 const router = useRouter()
@@ -29,7 +32,7 @@ const timeframe = ref('5m')
 const limit = ref(300)
 const hoverTime = ref<number | null>(null)
 const now = ref(Date.now())
-const listError = ref<string | null>(null)
+const listError = ref<ErrorDetailSource>(null)
 const booting = ref(true)
 const modeDialog = ref(false)
 
@@ -153,7 +156,7 @@ async function bootstrap() {
     syncQuery()
   } catch (e) {
     if (e instanceof UnauthorizedError) return void router.push('/login')
-    listError.value = e instanceof Error ? e.message : '加载交易对失败'
+    listError.value = e instanceof ApiFailure ? e : t('加载交易对失败')
   } finally {
     booting.value = false
   }
@@ -257,26 +260,26 @@ onMounted(() => void bootstrap())
 
 <template>
   <div class="page">
-    <TopBar :updated="ageSeconds !== null ? `数据 ${ageSeconds}s 前` : ''" :busy="loading" @refresh="reload" />
+    <TopBar :updated="ageSeconds !== null ? t('数据 {n}s 前', { n: ageSeconds }) : ''" :busy="loading" @refresh="reload" />
 
     <main class="main">
       <!-- 观察模式：整块换空态。不白屏、不出现红色错误——端点没坏，是 bot 没在交易 -->
-      <StatePanel v-if="shellMode" tone="info" title="未在交易模式">
-        <p>观察模式下进程不连接交易所，K 线接口不会返回任何行情。切到交易模式后这里才有数据。</p>
-        <button class="btn btn-primary btn-sm panel-act" type="button" @click="openModeDialog">切换模式</button>
+      <StatePanel v-if="shellMode" tone="info" :title="t('未在交易模式')">
+        <p>{{ t('观察模式下进程不连接交易所，K 线接口不会返回任何行情。切到交易模式后这里才有数据。') }}</p>
+        <button class="btn btn-primary btn-sm panel-act" type="button" @click="openModeDialog">{{ t('切换模式') }}</button>
       </StatePanel>
 
       <template v-else>
         <div class="toolbar card">
           <label class="field">
-            <span class="label">交易对</span>
+            <span class="label">{{ t('交易对') }}</span>
             <select class="input pick" :value="pair" :disabled="noWhitelist" @change="pickPair">
               <option v-for="item in pairs" :key="item" :value="item">{{ item }}</option>
             </select>
           </label>
 
           <div class="field">
-            <span class="label">粒度</span>
+            <span class="label">{{ t('粒度') }}</span>
             <div class="pills">
               <button
                 v-for="tf in timeframeOptions"
@@ -284,14 +287,14 @@ onMounted(() => void bootstrap())
                 type="button"
                 class="pill"
                 :class="{ on: timeframe === tf }"
-                :title="tf === baseTimeframe ? '配置里的主周期' : `由 ${baseTimeframe} 派生`"
+                :title="tf === baseTimeframe ? t('配置里的主周期') : t('由 {base} 派生', { base: baseTimeframe })"
                 @click="pickTimeframe(tf)"
               >{{ tf }}</button>
             </div>
           </div>
 
           <div class="field">
-            <span class="label">根数</span>
+            <span class="label">{{ t('根数') }}</span>
             <div class="pills">
               <button
                 v-for="value in LIMITS"
@@ -305,43 +308,43 @@ onMounted(() => void bootstrap())
           </div>
 
           <button class="btn btn-secondary btn-sm reload" type="button" :disabled="loading || !pair" @click="reload">
-            {{ loading ? '拉取中…' : '重新拉取' }}
+            {{ loading ? t('拉取中…') : t('重新拉取') }}
           </button>
         </div>
 
         <div class="notices">
-          <StatePanel v-if="listError" variant="inline" tone="error" :title="listError" action="重试" @action="bootstrap">
-            交易对来自 bot 的选币列表与配置白名单，与画布上的行情是两件事。
+          <StatePanel v-if="listError" variant="inline" tone="error" :title="errorDetailText(listError)" :action="t('重试')" @action="bootstrap">
+            {{ t('交易对来自 bot 的选币列表与配置白名单，与画布上的行情是两件事。') }}
           </StatePanel>
           <!-- 400 = pair 不在当前选币列表里：重试同一个 pair 只会再被拒，动作必须换成"重选" -->
           <StatePanel
             v-else-if="error && errorStatus === 400"
             variant="inline"
             tone="warn"
-            :title="error"
-            action="重新读取选币列表"
+            :title="errorDetailText(error, errorStatus)"
+            :action="t('重新读取选币列表')"
             @action="reloadMeta"
-          >动态选币每轮换批，之前选中的 pair 可能已被换出。重新读取后会落到当前可用的第一个。</StatePanel>
-          <StatePanel v-else-if="error" variant="inline" tone="error" :title="error" action="重试" @action="reload">
-            画布仍是上一次拿到的数据。
+          >{{ t('动态选币每轮换批，之前选中的 pair 可能已被换出。重新读取后会落到当前可用的第一个。') }}</StatePanel>
+          <StatePanel v-else-if="error" variant="inline" tone="error" :title="errorDetailText(error, errorStatus)" :action="t('重试')" @action="reload">
+            {{ t('画布仍是上一次拿到的数据。') }}
           </StatePanel>
           <StatePanel
             v-if="stale"
             variant="inline"
             tone="warn"
-            :title="`数据 ${ageSeconds}s 未刷新`"
-            action="刷新"
+            :title="t('数据 {n}s 未刷新', { n: ageSeconds })"
+            :action="t('刷新')"
             @action="reload"
-          >行情可能已断流，图不会淡出——留在屏幕上的仍是最后一次拿到的那批 K 线。</StatePanel>
+          >{{ t('行情可能已断流，图不会淡出——留在屏幕上的仍是最后一次拿到的那批 K 线。') }}</StatePanel>
         </div>
 
         <StatePanel
           v-if="noWhitelist && !pending"
           tone="warn"
-          title="没有可用的交易对"
-          action="重新读取"
+          :title="t('没有可用的交易对')"
+          :action="t('重新读取')"
           @action="reloadMeta"
-        >选币列表与配置白名单都是空的：观察模式下 bot 不连交易所，白名单要从配置里读。请先去配置页填 `exchange.pair_whitelist`。</StatePanel>
+        >{{ t('选币列表与配置白名单都是空的：观察模式下 bot 不连交易所，白名单要从配置里读。请先去配置页填 `exchange.pair_whitelist`。') }}</StatePanel>
 
         <template v-else>
           <ChartScopeBar :data="data" :age-seconds="ageSeconds" @retry="reload" />
@@ -355,13 +358,13 @@ onMounted(() => void bootstrap())
 
           <!-- 信号标记总览：空数组也要说清"是这段没信号"，而不是让人怀疑标记层没接上 -->
           <div v-if="data && !blocked" class="legend card">
-            <span class="eyebrow">信号标记</span>
-            <span v-if="!markerTotal" class="muted">这段窗口里策略没有任何开平仓信号</span>
+            <span class="eyebrow">{{ t('信号标记') }}</span>
+            <span v-if="!markerTotal" class="muted">{{ t('这段窗口里策略没有任何开平仓信号') }}</span>
             <span v-for="item in markerLegend" :key="item.kind" class="badge num" :class="{
               up: item.kind === 'enter_long' || item.kind === 'exit_short',
               down: item.kind === 'exit_long' || item.kind === 'enter_short',
-            }">{{ item.label }} {{ item.count }}</span>
-            <span v-if="markerTotal" class="muted num">共 {{ markerTotal }} 个</span>
+            }">{{ t(item.label) }} {{ item.count }}</span>
+            <span v-if="markerTotal" class="muted num">{{ t('共 {n} 个', { n: markerTotal }) }}</span>
           </div>
 
           <div v-if="!blocked" class="readout card">
@@ -383,9 +386,9 @@ onMounted(() => void bootstrap())
                       ? 'down'
                       : 'muted'
                 "
-              >{{ KIND_LABEL[marker.kind] }} @{{ price(marker.price) }} {{ marker.enter_tag ? `tag=${marker.enter_tag}` : marker.reason ?? '' }}</span>
+              >{{ t(KIND_LABEL[marker.kind]) }} @{{ price(marker.price) }} {{ marker.enter_tag ? `tag=${marker.enter_tag}` : marker.reason ?? '' }}</span>
             </template>
-            <span v-else class="muted">把光标移到画布上查看该根的开高低收与标记</span>
+            <span v-else class="muted">{{ t('把光标移到画布上查看该根的开高低收与标记') }}</span>
           </div>
         </template>
       </template>

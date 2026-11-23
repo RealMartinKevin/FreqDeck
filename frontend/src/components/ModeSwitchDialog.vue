@@ -11,6 +11,7 @@
  *     绝不把它们都说成「切换成功」。
  */
 
+import { t } from '../i18n'
 import { computed, ref, watch } from 'vue'
 import Modal from './Modal.vue'
 import StatePanel from './StatePanel.vue'
@@ -27,8 +28,8 @@ const { state, switchState, beginConfirm, resetSwitch, switchTo } = useAppMode()
 const target = computed<AppMode>(() => (state.mode === 'trade' ? 'shell' : 'trade'))
 
 const goingLive = computed(() => target.value === 'trade')
-const toLiveCaption = computed(() => (state.dryRun === false ? '进入交易模式（实盘）' : '进入交易模式（模拟）'))
-const title = computed(() => (goingLive.value ? toLiveCaption.value : '返回观察模式'))
+const toLiveCaption = computed(() => (state.dryRun === false ? t('进入交易模式（实盘）') : t('进入交易模式（模拟）')))
+const title = computed(() => (goingLive.value ? toLiveCaption.value : t('返回观察模式')))
 
 /** 实盘确认：只有 dry_run 明确为 false 时才要求键入，未知(false? null)时不拦 */
 const needsLiveTyping = computed(() => goingLive.value && state.dryRun === false)
@@ -66,7 +67,7 @@ function close() {
   <Modal :open="open" @close="close">
     <div class="head">
       <h2 class="title">{{ title }}</h2>
-      <button class="x" type="button" aria-label="关闭" :disabled="busy" @click="close">
+      <button class="x" type="button" :aria-label="t('关闭')" :disabled="busy" @click="close">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7L7 17" /></svg>
       </button>
     </div>
@@ -75,24 +76,24 @@ function close() {
     <template v-if="phase === 'idle' || phase === 'confirming'">
       <p class="lead">
         <template v-if="goingLive">
-          进程会重启并开始连接交易所。重启期间（约 5–15 秒）本页面会短暂失去连接，这是正常过程。
+          {{ t('进程会重启并开始连接交易所。重启期间（约 5–15 秒）本页面会短暂失去连接，这是正常过程。') }}
         </template>
         <template v-else>
-          进程会重启为观察模式：只保留 API 与界面，<b>不再连接交易所、不产生交易数据</b>。已有持仓不会被平掉。
+          {{ t('进程会重启为观察模式：只保留 API 与界面，') }}<b>{{ t('不再连接交易所、不产生交易数据') }}</b>{{ t('。已有持仓不会被平掉。') }}
         </template>
       </p>
 
-      <StatePanel v-if="goingLive && state.dryRun === false" variant="inline" tone="warn" title="这是实盘">
-        实盘模式下每一次下单都会使用真实资金。确认请在下方键入 <code>LIVE</code>。
+      <StatePanel v-if="goingLive && state.dryRun === false" variant="inline" tone="warn" :title="t('这是实盘')">
+        {{ t('实盘模式下每一次下单都会使用真实资金。确认请在下方键入 ') }}<code>LIVE</code>{{ t('。') }}
       </StatePanel>
 
       <label v-if="needsLiveTyping" class="live">
-        <span class="label">键入 LIVE 以确认</span>
+        <span class="label">{{ t('键入 LIVE 以确认') }}</span>
         <input v-model="typed" class="input" type="text" placeholder="LIVE" autocomplete="off" spellcheck="false" />
       </label>
 
       <div class="actions">
-        <button class="btn btn-secondary" type="button" @click="close">取消</button>
+        <button class="btn btn-secondary" type="button" @click="close">{{ t('取消') }}</button>
         <button
           class="btn"
           :class="goingLive && state.dryRun === false ? 'btn-danger' : 'btn-primary'"
@@ -110,55 +111,55 @@ function close() {
       <div class="progress">
         <span class="spinner" aria-hidden="true" />
         <div>
-          <p class="ptitle">{{ SWITCH_PROGRESS_TEXT }}</p>
-          <p class="psub">已等待 {{ Math.round(switchState.elapsedMs / 1000) }} 秒 · 期间不显示网络错误</p>
+          <p class="ptitle">{{ t(SWITCH_PROGRESS_TEXT) }}</p>
+          <p class="psub">{{ t('已等待 {n} 秒 · 期间不显示网络错误', { n: Math.round(switchState.elapsedMs / 1000) }) }}</p>
         </div>
       </div>
       <p v-if="phase === 'slow'" class="lead">
-        进程已经切到目标模式，但还没开始交易。可能在加载策略或交易所响应慢，仍在继续等待。
+        {{ t('进程已经切到目标模式，但还没开始交易。可能在加载策略或交易所响应慢，仍在继续等待。') }}
       </p>
     </template>
 
     <!-- 成功 -->
     <template v-else-if="phase === 'success'">
-      <StatePanel variant="inline" tone="info" title="已切换">
-        现在是{{ state.mode === 'trade' ? (state.dryRun === false ? '交易模式（实盘）' : '交易模式（模拟）') : '观察模式' }}。
+      <StatePanel variant="inline" tone="info" :title="t('已切换')">
+        {{ t('现在是 {mode}。', { mode: state.mode === 'trade' ? (state.dryRun === false ? t('交易模式（实盘）') : t('交易模式（模拟）')) : t('观察模式') }) }}
       </StatePanel>
       <div class="actions">
-        <button class="btn btn-primary" type="button" @click="close">完成</button>
+        <button class="btn btn-primary" type="button" @click="close">{{ t('完成') }}</button>
       </div>
     </template>
 
     <!-- 慢启动 -->
     <template v-else-if="phase === 'slow'">
-      <StatePanel variant="inline" tone="warn" title="启动很慢">
-        进程已在目标模式，但还没开始交易。去运维页看日志能知道卡在哪一步。
+      <StatePanel variant="inline" tone="warn" :title="t('启动很慢')">
+        {{ t('进程已在目标模式，但还没开始交易。去运维页看日志能知道卡在哪一步。') }}
       </StatePanel>
       <div class="actions">
-        <button class="btn btn-secondary" type="button" @click="close">关闭</button>
-        <button class="btn btn-primary" type="button" @click="emit('goOps')">去运维</button>
+        <button class="btn btn-secondary" type="button" @click="close">{{ t('关闭') }}</button>
+        <button class="btn btn-primary" type="button" @click="emit('goOps')">{{ t('去运维') }}</button>
       </div>
     </template>
 
     <!-- 回退失败：原文照展示 -->
     <template v-else-if="phase === 'reverted'">
-      <StatePanel variant="inline" tone="error" title="启动失败，已回退到观察模式" />
+      <StatePanel variant="inline" tone="error" :title="t('启动失败，已回退到观察模式')" />
       <pre class="raw">{{ switchState.message }}</pre>
       <div class="actions">
-        <button class="btn btn-secondary" type="button" @click="close">关闭</button>
-        <button class="btn btn-secondary" type="button" @click="emit('goConfig')">去配置</button>
-        <button class="btn btn-primary" type="button" @click="confirm">重试</button>
+        <button class="btn btn-secondary" type="button" @click="close">{{ t('关闭') }}</button>
+        <button class="btn btn-secondary" type="button" @click="emit('goConfig')">{{ t('去配置') }}</button>
+        <button class="btn btn-primary" type="button" @click="confirm">{{ t('重试') }}</button>
       </div>
     </template>
 
     <!-- 连不上 -->
     <template v-else>
-      <StatePanel variant="inline" tone="error" title="仍未恢复">
-        刷新页面重试；如果进程已退出，请到启动它的终端查看日志。
+      <StatePanel variant="inline" tone="error" :title="t('仍未恢复')">
+        {{ t('刷新页面重试；如果进程已退出，请到启动它的终端查看日志。') }}
       </StatePanel>
       <div class="actions">
-        <button class="btn btn-secondary" type="button" @click="emit('goOps')">去运维</button>
-        <button class="btn btn-primary" type="button" @click="close">关闭</button>
+        <button class="btn btn-secondary" type="button" @click="emit('goOps')">{{ t('去运维') }}</button>
+        <button class="btn btn-primary" type="button" @click="close">{{ t('关闭') }}</button>
       </div>
     </template>
   </Modal>

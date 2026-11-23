@@ -9,9 +9,11 @@
  * 把 1 和 2 都说成「登录失败」等于让用户去猜。
  */
 
+import { t } from '../i18n'
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ApiFailure, NetworkError, UnauthorizedError, api } from '../api/client'
+import { ApiFailure, NetworkError, UnauthorizedError, api, errorDetailText } from '../api/client'
+import type { ErrorDetailSource } from '../api/client'
 
 const route = useRoute()
 const router = useRouter()
@@ -20,7 +22,7 @@ const router = useRouter()
 const username = ref('admin')
 const password = ref('')
 const pending = ref(false)
-const error = ref<string | null>(null)
+const error = ref<ErrorDetailSource>(null)
 const shaking = ref(false)
 
 /** 被 401 踢回来时先解释一句，而不是让用户以为「刚才没登录成功」 */
@@ -29,7 +31,7 @@ const expired = computed(() => route.query.expired === '1')
 async function submit() {
   if (pending.value) return
   if (!username.value.trim() || !password.value) {
-    error.value = '请输入用户名与密码'
+    error.value = t('请输入用户名与密码')
     return
   }
   pending.value = true
@@ -47,11 +49,12 @@ async function submit() {
   }
 }
 
-function describe(e: unknown): string {
-  if (e instanceof UnauthorizedError) return '账号或密码不正确'
-  if (e instanceof NetworkError) return '无法连接服务，请确认 freqtrade 进程在运行'
-  if (e instanceof ApiFailure) return e.detail
-  return '登录失败，请重试'
+function describe(e: unknown): ErrorDetailSource {
+  if (e instanceof UnauthorizedError) return t('账号或密码不正确')
+  if (e instanceof NetworkError) return t('无法连接服务，请确认 freqtrade 进程在运行')
+  // 保留整个失败对象（含 status），渲染处用 errorDetailText 才能把 {n} 换成真实 HTTP 码
+  if (e instanceof ApiFailure) return e
+  return t('登录失败，请重试')
 }
 
 function shake() {
@@ -68,13 +71,13 @@ function shake() {
           <path d="M4 7h16M4 12h10M4 17h6" />
         </svg>
       </div>
-      <h1 class="title">Freqtrade 控制台</h1>
-      <p class="hint desc">用启动时打印的账号密码登录</p>
+      <h1 class="title">{{ t('Freqtrade 控制台') }}</h1>
+      <p class="hint desc">{{ t('用启动时打印的账号密码登录') }}</p>
 
-      <p v-if="expired && !error" class="notice" role="status">登录已过期，请重新登录</p>
+      <p v-if="expired && !error" class="notice" role="status">{{ t('登录已过期，请重新登录') }}</p>
 
       <label class="field">
-        <span class="label">用户名</span>
+        <span class="label">{{ t('用户名') }}</span>
         <input
           v-model="username"
           type="text"
@@ -87,28 +90,28 @@ function shake() {
       </label>
 
       <label class="field">
-        <span class="label">密码</span>
+        <span class="label">{{ t('密码') }}</span>
         <input
           v-model="password"
           type="password"
           class="input"
           :class="{ invalid: error }"
-          placeholder="密码"
+          :placeholder="t('密码')"
           autocomplete="current-password"
           autofocus
           @input="error = null"
         />
       </label>
 
-      <p v-if="error" class="err" role="alert">{{ error }}</p>
+      <p v-if="error" class="err" role="alert">{{ errorDetailText(error) }}</p>
 
       <button class="btn btn-primary submit" type="submit" :disabled="pending">
-        {{ pending ? '登录中…' : '登录' }}
+        {{ pending ? t('登录中…') : t('登录') }}
       </button>
 
       <!-- 首启提示：密码只在启动终端里打印一次，找不到入口会让人以为是 bug -->
       <p class="hint first-run">
-        首次启动时，账号密码由 freqtrade 在终端打印一次，并写入用户目录下的凭据文件。
+        {{ t('首次启动时，账号密码由 freqtrade 在终端打印一次，并写入用户目录下的凭据文件。') }}
       </p>
     </form>
   </div>

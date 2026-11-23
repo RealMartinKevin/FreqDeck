@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { t } from '../i18n'
 import { computed } from 'vue'
 import type { ApiState, BotState, ProcessState } from '../api/types'
 
@@ -63,10 +64,10 @@ const badges = computed<Badge[]>(() => [
       :key="b.label + b.title"
       class="badge"
       :class="`t-${b.tone}`"
-      :title="b.title"
+      :title="t(b.title)"
     >
       <i class="dot" />
-      {{ b.label }}
+      {{ t(b.label) }}
     </span>
   </div>
 </template>

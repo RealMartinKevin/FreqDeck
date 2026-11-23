@@ -11,6 +11,7 @@
  */
 
 import { reactive, readonly } from 'vue'
+import { t } from '../../i18n'
 import { ApiFailure, normalizeThrown } from './errors'
 import { get, post, setInterrupting } from './http'
 import type { AppMode, ModeAccepted, RawAppInfo } from '../types'
@@ -157,23 +158,25 @@ export function describeMode(source: {
   reachable: boolean
   loaded: boolean
 }): ModeBadgeInfo {
-  if (!source.loaded) return { label: '读取中', tone: 'muted', title: '正在读取 bot 状态' }
+  // 本函数只在组件的 computed / 模板渲染路径内被调用（见 useAppMode.badge），
+  // 因此这里调用 t() 会随语言切换自动重算；不要在 fetch 阶段把结果烘焙进数据。
+  if (!source.loaded) return { label: t('读取中'), tone: 'muted', title: t('正在读取 bot 状态') }
   if (!source.reachable) {
-    return { label: '连接中断', tone: 'warn', title: '读不到 /app/info：进程可能正在重启或已退出' }
+    return { label: t('连接中断'), tone: 'warn', title: t('读不到 /app/info：进程可能正在重启或已退出') }
   }
   if (source.mode === 'trade') {
     if (source.tradingActive !== true) {
-      return { label: '交易模式 · 启动中', tone: 'warn', title: '进程已切到交易模式，但还没开始交易（可能在加载策略/连交易所）' }
+      return { label: t('交易模式 · 启动中'), tone: 'warn', title: t('进程已切到交易模式，但还没开始交易（可能在加载策略/连交易所）') }
     }
     if (source.dryRun === false) {
-      return { label: '交易模式 · 实盘', tone: 'down', title: '实盘：真实资金在交易，每一次下单都会成交' }
+      return { label: t('交易模式 · 实盘'), tone: 'down', title: t('实盘：真实资金在交易，每一次下单都会成交') }
     }
-    return { label: '交易模式 · 模拟', tone: 'up', title: '模拟盘：dry-run，不涉及真实资金' }
+    return { label: t('交易模式 · 模拟'), tone: 'up', title: t('模拟盘：dry-run，不涉及真实资金') }
   }
   if (source.mode === 'shell') {
-    return { label: '观察模式', tone: 'muted', title: '观察模式：只跑 API 与界面，不连交易所、不产生交易数据' }
+    return { label: t('观察模式'), tone: 'muted', title: t('观察模式：只跑 API 与界面，不连交易所、不产生交易数据') }
   }
-  return { label: '未知', tone: 'muted', title: '后端未返回可识别的模式' }
+  return { label: t('未知'), tone: 'muted', title: t('后端未返回可识别的模式') }
 }
 
 /** 给组件用的便捷版本（直接读单例） */
@@ -277,7 +280,7 @@ export async function switchTo(target: AppMode): Promise<SwitchPhase> {
   // ★ C2：这个端点是 HTTP 200，成功与否只看 accepted
   if (ack.accepted !== true) {
     switchState.phase = 'idle'
-    switchState.message = ack.message || '后端拒绝切换模式'
+    switchState.message = ack.message || t('后端拒绝切换模式')
     emitSettled('idle')
     return switchState.phase
   }

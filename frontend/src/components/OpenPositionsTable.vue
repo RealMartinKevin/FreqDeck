@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { t } from '../i18n'
 import { computed } from 'vue'
 import type { OpenPositionRow, PositionsOut } from '../api/types'
 import { money, pct, price, qty, signed, tone } from '../composables/useFormat'
@@ -17,7 +18,7 @@ const props = withDefaults(
     emptyText?: string
     busy?: boolean
   }>(),
-  { availability: () => [], emptyText: '当前没有未平仓持仓', busy: false },
+  { availability: () => [], emptyText: t('当前没有未平仓持仓'), busy: false },
 )
 
 const emit = defineEmits<{ action: [row: OpenPositionRow]; detail: [row: OpenPositionRow] }>()
@@ -45,17 +46,17 @@ function shortTime(iso: string): string {
     <TableShell :empty="!props.rows.length" :dim="props.busy">
       <template #head>
         <tr>
-          <th class="l">交易对</th>
-          <th class="l">方向</th>
-          <th>开仓价</th>
-          <th>当前价</th>
-          <th>未实现</th>
+          <th class="l">{{ t('交易对') }}</th>
+          <th class="l">{{ t('方向') }}</th>
+          <th>{{ t('开仓价') }}</th>
+          <th>{{ t('当前价') }}</th>
+          <th>{{ t('未实现') }}</th>
           <th>ROE</th>
-          <th>距止损</th>
-          <th>开仓时间 (UTC)</th>
-          <th class="extra">数量</th>
-          <th class="extra">保证金</th>
-          <th class="extra l">入场标签</th>
+          <th>{{ t('距止损') }}</th>
+          <th>{{ t('开仓时间 (UTC)') }}</th>
+          <th class="extra">{{ t('数量') }}</th>
+          <th class="extra">{{ t('保证金') }}</th>
+          <th class="extra l">{{ t('入场标签') }}</th>
           <th />
         </tr>
       </template>
@@ -64,19 +65,19 @@ function shortTime(iso: string): string {
         <tr v-for="row in props.rows" :key="row.trade_id">
           <td class="l">
             <!-- 币对本身就是「看这一笔」的入口：比再加一列按钮省横向空间 -->
-            <button class="pairlink" type="button" :title="`查看 ${row.pair} 的订单与自定义数据`"
+            <button class="pairlink" type="button" :title="t('查看 {pair} 的订单与自定义数据', { pair: row.pair })"
               @click="emit('detail', row)">
               {{ row.pair }}
             </button>
           </td>
           <td class="l">
-            {{ row.side === 'long' ? '做多' : '做空' }}
+            {{ row.side === 'long' ? t('做多') : t('做空') }}
             <span v-if="row.leverage !== null" class="lev num">· {{ row.leverage }}x</span>
           </td>
           <td class="num">
             {{ price(row.open_rate) }}
             <!-- 窄屏把保证金并进这里：信息换位置，不丢 -->
-            <span class="sub num">保证金 {{ money(row.stake_amount) }}</span>
+            <span class="sub num">{{ t('保证金 {amount}', { amount: money(row.stake_amount) }) }}</span>
           </td>
           <td class="num">{{ price(row.current_rate) }}</td>
           <td class="num" :class="tone(row.unrealized_abs)">{{ signed(row.unrealized_abs) }}</td>
@@ -91,7 +92,7 @@ function shortTime(iso: string): string {
           </td>
           <td class="act">
             <!-- 未平仓的操作是「仓位动作」（强制平仓 / 取消挂单），复盘属于已平仓 -->
-            <button class="btn btn-secondary btn-sm" type="button" @click="emit('action', row)">操作</button>
+            <button class="btn btn-secondary btn-sm" type="button" @click="emit('action', row)">{{ t('操作') }}</button>
           </td>
         </tr>
       </template>
@@ -107,9 +108,9 @@ function shortTime(iso: string): string {
       class="note"
       variant="inline"
       tone="warn"
-      :title="AVAIL[entry.available] ?? entry.available"
+      :title="t(AVAIL[entry.available] ?? entry.available)"
     >
-      <span :title="entry.reason ?? ''">{{ entry.reason ?? '没有更多细节' }}</span>
+      <span :title="entry.reason ?? ''">{{ entry.reason ?? t('没有更多细节') }}</span>
     </StatePanel>
   </div>
 </template>

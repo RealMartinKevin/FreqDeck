@@ -11,6 +11,7 @@
  * 「我点了启动但没在交易」这种无解疑问——因为观察模式下进程本身是活的。
  */
 
+import { t } from '../i18n'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { api } from '../api/client'
 import type { InstanceOverview } from '../api/types'
@@ -58,9 +59,9 @@ const runmode = computed(() => dash(state.runmode))
  * `trading_active === null`（还没读到）时显示「未知」，而不是乐观地写「正在交易」。
  */
 const trading = computed<{ label: string; tone: string }>(() => {
-  if (state.tradingActive === true) return { label: '正在交易', tone: 'up' }
-  if (state.tradingActive === false) return { label: '未在交易', tone: 'warn' }
-  return { label: '未知', tone: 'muted' }
+  if (state.tradingActive === true) return { label: t('正在交易'), tone: 'up' }
+  if (state.tradingActive === false) return { label: t('未在交易'), tone: 'warn' }
+  return { label: t('未知'), tone: 'muted' }
 })
 
 /**
@@ -68,15 +69,15 @@ const trading = computed<{ label: string; tone: string }>(() => {
  * 用户看到的界面来自 dev server 或旧部署，这解释了「我改了代码但界面没变」。
  */
 const ui = computed<{ label: string; tone: string; hint: string | null }>(() => {
-  if (state.uiReady === true) return { label: '已部署', tone: 'up', hint: null }
+  if (state.uiReady === true) return { label: t('已部署'), tone: 'up', hint: null }
   if (state.uiReady === false) {
     return {
-      label: '未就绪',
+      label: t('未就绪'),
       tone: 'warn',
-      hint: '后端没在 app/static 找到前端产物：当前页面可能来自开发服务器，或 dist 还没放进去。',
+      hint: t('后端没在 app/static 找到前端产物：当前页面可能来自开发服务器，或 dist 还没放进去。'),
     }
   }
-  return { label: '未知', tone: 'muted', hint: null }
+  return { label: t('未知'), tone: 'muted', hint: null }
 })
 
 const stateFilePath = computed(() => (state.stateFile === null ? null : state.stateFile))
@@ -87,7 +88,7 @@ const stateFileOpen = ref(false)
   <section class="card status">
     <header class="head">
       <div>
-        <p class="eyebrow">Bot 状态</p>
+        <p class="eyebrow">{{ t('Bot 状态') }}</p>
         <h2 class="name">freqtrade</h2>
       </div>
       <span class="mode" :class="`t-${badge.tone}`">
@@ -98,35 +99,35 @@ const stateFileOpen = ref(false)
 
     <dl class="grid">
       <div class="cell">
-        <dt>交易所</dt>
+        <dt>{{ t('交易所') }}</dt>
         <dd>{{ exchange }}</dd>
       </div>
       <div class="cell">
-        <dt>策略</dt>
+        <dt>{{ t('策略') }}</dt>
         <dd>{{ strategy }}</dd>
       </div>
       <div class="cell">
-        <dt>周期</dt>
+        <dt>{{ t('周期') }}</dt>
         <dd class="num">{{ period }}</dd>
       </div>
       <div class="cell">
-        <dt>计价币</dt>
+        <dt>{{ t('计价币') }}</dt>
         <dd>{{ currency }}</dd>
       </div>
       <div class="cell">
-        <dt>运行模式</dt>
+        <dt>{{ t('运行模式') }}</dt>
         <dd>{{ runmode }}</dd>
       </div>
       <div class="cell">
-        <dt>版本</dt>
+        <dt>{{ t('版本') }}</dt>
         <dd class="num">{{ version }}</dd>
       </div>
       <div class="cell">
-        <dt>交易</dt>
+        <dt>{{ t('交易') }}</dt>
         <dd :class="`t-${trading.tone}`">{{ trading.label }}</dd>
       </div>
       <div class="cell">
-        <dt>前端</dt>
+        <dt>{{ t('前端') }}</dt>
         <dd :class="`t-${ui.tone}`">
           {{ ui.label }}
           <span v-if="ui.hint" class="tip" :title="ui.hint">?</span>
@@ -142,11 +143,11 @@ const stateFileOpen = ref(false)
         <svg :class="{ open: stateFileOpen }" viewBox="0 0 24 24" aria-hidden="true">
           <path d="M9 6l6 6-6 6" />
         </svg>
-        状态文件
+        {{ t('状态文件') }}
       </button>
       <code v-if="stateFileOpen" class="path">{{ stateFilePath }}</code>
     </div>
-    <p v-else class="file-missing">状态文件路径：—（未从 /app/info 取到）</p>
+    <p v-else class="file-missing">{{ t('状态文件路径：—（未从 /app/info 取到）') }}</p>
   </section>
 </template>
 

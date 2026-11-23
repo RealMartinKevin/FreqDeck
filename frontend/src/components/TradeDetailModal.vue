@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import { t } from '../i18n'
 import { computed, ref, watch } from 'vue'
-import { api } from '../api/client'
+import { api, errorDetailText, ApiFailure } from '../api/client'
+import type { ErrorDetailSource } from '../api/client'
 import type { TradeDetail, TradeDetailOut, TradeOrder } from '../api/types'
 import { duration, qty, signed, tone } from '../composables/useFormat'
 import Modal from './Modal.vue'
@@ -10,7 +12,7 @@ const emit = defineEmits<{ close: [] }>()
 
 const data = ref<TradeDetailOut | null>(null)
 const loading = ref(false)
-const error = ref<string | null>(null)
+const error = ref<ErrorDetailSource>(null)
 const showCustom = ref(false)
 
 const trade = computed<TradeDetail | null>(() => data.value?.trade ?? null)
@@ -52,9 +54,14 @@ async function load() {
   data.value = null
   try {
     data.value = await api.tradeDetail(props.instanceId, props.tradeId)
-    if (data.value.available !== 'ok') error.value = data.value.reason ?? '交易接口当前不可达'
+    if (data.value.available !== 'ok') {
+      error.value =
+        data.value.reason === null
+          ? t('交易接口当前不可达')
+          : { detail: data.value.reason, status: data.value.status }
+    }
   } catch (e) {
-    error.value = (e as Error).message || '加载交易详情失败'
+    error.value = e instanceof ApiFailure ? e : t('加载交易详情失败')
   } finally {
     loading.value = false
   }
@@ -83,51 +90,51 @@ function fmtNum(v: number | null | undefined, digits = 6): string {
     <div class="detail">
       <header class="dhead">
         <div class="id">
-          <span class="pair">{{ trade?.pair ?? '加载中…' }}</span>
+          <span class="pair">{{ trade?.pair ?? t('加载中…') }}</span>
           <span v-if="trade" class="badge" :class="trade.is_open ? 'open' : 'closed'">
-            {{ trade.is_open ? '持仓中' : '已平仓' }}
+            {{ trade.is_open ? t('持仓中') : t('已平仓') }}
           </span>
           <span v-if="trade?.side" class="badge side" :class="trade.side === 'short' ? 'down' : 'up'">
-            {{ trade.side === 'short' ? '空' : '多' }}
+            {{ trade.side === 'short' ? t('空') : t('多') }}
           </span>
         </div>
-        <button class="x" type="button" aria-label="关闭" @click="emit('close')">✕</button>
+        <button class="x" type="button" :aria-label="t('关闭')" @click="emit('close')">✕</button>
       </header>
 
-      <p v-if="loading" class="muted">正在从交易接口读取…</p>
+      <p v-if="loading" class="muted">{{ t('正在从交易接口读取…') }}</p>
 
       <div v-else-if="error" class="err">
-        <p>{{ error }}</p>
+        <p>{{ errorDetailText(error) }}</p>
         <p class="muted small">
-          详情来自交易接口，不是本地库：进程未在交易模式或该笔已被清理时读不到。已平仓明细请回持仓页看本地记录。
+          {{ t('详情来自交易接口，不是本地库：进程未在交易模式或该笔已被清理时读不到。已平仓明细请回持仓页看本地记录。') }}
         </p>
-        <button class="btn btn-secondary btn-sm" type="button" @click="load">重试</button>
+        <button class="btn btn-secondary btn-sm" type="button" @click="load">{{ t('重试') }}</button>
       </div>
 
       <template v-else-if="trade">
         <div class="stats">
           <div class="cell">
-            <span class="k">开仓均价</span>
+            <span class="k">{{ t('开仓均价') }}</span>
             <strong class="num">{{ fmtNum(trade.open_rate) }}</strong>
           </div>
           <div class="cell">
-            <span class="k">平仓均价</span>
+            <span class="k">{{ t('平仓均价') }}</span>
             <strong class="num">{{ fmtNum(trade.close_rate) }}</strong>
           </div>
           <div class="cell">
-            <span class="k">数量</span>
+            <span class="k">{{ t('数量') }}</span>
             <strong class="num">{{ qty(trade.amount ?? null) }}</strong>
           </div>
           <div class="cell">
-            <span class="k">名义本金</span>
+            <span class="k">{{ t('名义本金') }}</span>
             <strong class="num">{{ fmtNum(trade.stake_amount) }}</strong>
           </div>
           <div class="cell">
-            <span class="k">杠杆</span>
+            <span class="k">{{ t('杠杆') }}</span>
             <strong class="num">{{ trade.leverage != null ? `${trade.leverage}×` : '—' }}</strong>
           </div>
           <div class="cell">
-            <span class="k">{{ trade.is_open ? '浮动盈亏' : '已实现盈亏' }}</span>
+            <span class="k">{{ trade.is_open ? t('浮动盈亏') : t('已实现盈亏') }}</span>
             <strong class="num" :class="tone(trade.profit_abs ?? null)">
               {{ signed(trade.profit_abs ?? null) }}
             </strong>
@@ -135,33 +142,33 @@ function fmtNum(v: number | null | undefined, digits = 6): string {
         </div>
 
         <dl class="meta">
-          <div><dt>开仓</dt><dd class="num">{{ fmt(timeOf(trade, 'open')) }}</dd></div>
-          <div><dt>平仓</dt><dd class="num">{{ fmt(timeOf(trade, 'close')) }}</dd></div>
-          <div><dt>持仓</dt><dd class="num">{{ duration(heldSeconds) }}</dd></div>
-          <div><dt>入场标签</dt><dd class="mono">{{ trade.enter_tag ?? '—' }}</dd></div>
-          <div><dt>出场原因</dt><dd class="mono">{{ trade.exit_reason ?? '—' }}</dd></div>
+          <div><dt>{{ t('开仓') }}</dt><dd class="num">{{ fmt(timeOf(trade, 'open')) }}</dd></div>
+          <div><dt>{{ t('平仓') }}</dt><dd class="num">{{ fmt(timeOf(trade, 'close')) }}</dd></div>
+          <div><dt>{{ t('持仓') }}</dt><dd class="num">{{ duration(heldSeconds) }}</dd></div>
+          <div><dt>{{ t('入场标签') }}</dt><dd class="mono">{{ trade.enter_tag ?? '—' }}</dd></div>
+          <div><dt>{{ t('出场原因') }}</dt><dd class="mono">{{ trade.exit_reason ?? '—' }}</dd></div>
           <div><dt>ID</dt><dd class="mono">{{ trade.trade_id }}</dd></div>
         </dl>
 
         <section class="orders">
-          <h3 class="sub">订单（{{ orders.length }}）</h3>
-          <p v-if="!orders.length" class="muted small">上游没有返回订单明细。</p>
+          <h3 class="sub">{{ t('订单（{n}）', { n: orders.length }) }}</h3>
+          <p v-if="!orders.length" class="muted small">{{ t('上游没有返回订单明细。') }}</p>
           <table v-else class="tbl">
             <thead>
               <tr>
-                <th>方向</th>
-                <th>类型</th>
-                <th class="right">价格</th>
-                <th class="right">成交/数量</th>
-                <th>状态</th>
-                <th>撤单原因</th>
+                <th>{{ t('方向') }}</th>
+                <th>{{ t('类型') }}</th>
+                <th class="right">{{ t('价格') }}</th>
+                <th class="right">{{ t('成交/数量') }}</th>
+                <th>{{ t('状态') }}</th>
+                <th>{{ t('撤单原因') }}</th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="o in orders" :key="o.order_id">
                 <td>
                   <span class="side-dot" :class="orderSide(o) === 'buy' ? 'up' : 'down'" />
-                  {{ orderSide(o) === 'buy' ? '买' : '卖' }}
+                  {{ orderSide(o) === 'buy' ? t('买') : t('卖') }}
                 </td>
                 <td class="mono small">{{ o.order_type ?? '—' }}</td>
                 <td class="right num">{{ fmtNum(o.average ?? o.price) }}</td>
@@ -179,7 +186,7 @@ function fmtNum(v: number | null | undefined, digits = 6): string {
 
         <section v-if="data?.custom_data?.length" class="custom">
           <button class="linkbtn" type="button" @click="showCustom = !showCustom">
-            {{ showCustom ? '收起' : '展开' }}策略自定义数据（{{ data.custom_data.length }}）
+            {{ t('{action}策略自定义数据（{n}）', { action: showCustom ? t('收起') : t('展开'), n: data.custom_data.length }) }}
           </button>
           <pre v-if="showCustom" class="pre">{{ JSON.stringify(data.custom_data, null, 2) }}</pre>
         </section>

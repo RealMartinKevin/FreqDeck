@@ -114,7 +114,12 @@ export const api = {
     } catch (error) {
       if (error instanceof ApiFailure && error.kind === 'aborted') throw error
       const failure = error instanceof ApiFailure ? error : new ApiFailure('server_error', {})
-      return { action, trade_id: tradeId, ok: false, error: { kind: failure.kind, detail: failure.detail } }
+      return {
+        action,
+        trade_id: tradeId,
+        ok: false,
+        error: { kind: failure.kind, detail: failure.detail, status: failure.status },
+      }
     }
   },
 

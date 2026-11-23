@@ -8,18 +8,21 @@
  */
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { MAIN_ID, NetworkError, UnauthorizedError, api } from '../api/client'
+import { MAIN_ID, NetworkError, UnauthorizedError, api, errorDetailText } from '../api/client'
+import { ApiFailure } from '../api/client'
+import type { ErrorDetailSource } from '../api/client'
 import type { AnalyticsOut, PairPerf, PeriodPoint, TagPerf } from '../api/types'
 import { pct, signed, tone } from '../composables/useFormat'
 import { usePolling } from '../composables/usePolling'
 import TopBar from '../components/TopBar.vue'
+import { t } from '../i18n'
 
 const router = useRouter()
 
 const days = ref(30)
 const data = ref<AnalyticsOut | null>(null)
 const loading = ref(false)
-const pageError = ref<string | null>(null)
+const pageError = ref<ErrorDetailSource>(null)
 const fetchedAt = ref(0)
 const now = ref(Date.now())
 
@@ -43,9 +46,9 @@ const SEGMENT_LABELS: Record<string, string> = {
 }
 
 const updatedText = computed(() => {
-  if (!fetchedAt.value) return '正在获取…'
+  if (!fetchedAt.value) return t('正在获取…')
   const s = Math.max(0, Math.floor((now.value - fetchedAt.value) / 1000))
-  return s < 2 ? '刚刚更新' : `数据更新于 ${s} 秒前`
+  return s < 2 ? t('刚刚更新') : t('数据更新于 {n} 秒前', { n: s })
 })
 
 // ------------------------------------------------------------------ 逐段状态
@@ -58,9 +61,9 @@ function segError(key: string): string | null {
 /** 段说明：观察模式说「不读交易数据」，其它失败给原文，没失败但为空就直说为空 */
 function segNote(key: string): string {
   const raw = segError(key)
-  if (raw === null) return '这一段目前没有数据（不是加载失败）'
-  if (raw.startsWith('not_ready')) return '观察模式不读取交易数据'
-  return `未取到：${raw}`
+  if (raw === null) return t('这一段目前没有数据（不是加载失败）')
+  if (raw.startsWith('not_ready')) return t('观察模式不读取交易数据')
+  return t('未取到：{raw}', { raw })
 }
 
 /** true = 不是故障（观察模式 / 本段确实为空），用次要色；false = 真失败，用警示色 */
@@ -73,7 +76,7 @@ function segSoft(key: string): boolean {
 const all = computed(() => data.value?.profit_all?.all ?? null)
 const currency = computed(() => data.value?.stake_currency ?? '')
 /** 金额单位后缀：币种未知（观察模式取不到 /balance）时整个括号不出现，别留一个空 `（）` */
-const unitSuffix = computed(() => (currency.value ? `（${currency.value}）` : ''))
+const unitSuffix = computed(() => (currency.value ? t('（{n}）', { n: currency.value }) : ''))
 
 /** 胜率优先用上游 winrate（百分数），没有就用胜/负笔数自算；两者都缺才是 null */
 const winrate = computed<number | null>(() => {
@@ -176,12 +179,14 @@ function barHeight(v: number, max: number): string {
   return `${Math.max(2, (Math.abs(v) / max) * 100)}%`
 }
 
-function handle(e: unknown): string | null {
+function handle(e: unknown): ErrorDetailSource {
   if (e instanceof UnauthorizedError) {
     void router.push('/login')
     return null
   }
-  return e instanceof NetworkError ? '无法连接交易接口' : (e as Error).message || '加载统计失败'
+  if (e instanceof NetworkError) return t('无法连接交易接口')
+  if (e instanceof ApiFailure) return e
+  return (e as Error).message || t('加载统计失败')
 }
 
 async function load() {
@@ -218,9 +223,9 @@ onMounted(() => void load())
   <main class="page">
     <section class="card head fade-up">
       <div class="title-block">
-        <h1 class="page-title">统计</h1>
+        <h1 class="page-title">{{ t('统计') }}</h1>
         <p class="muted small">
-          数据全部来自 bot 的交易接口，逐段独立：某一段取不到只影响它自己。
+          {{ t('数据全部来自 bot 的交易接口，逐段独立：某一段取不到只影响它自己。') }}
         </p>
       </div>
       <div class="windows">
@@ -232,18 +237,18 @@ onMounted(() => void load())
           type="button"
           @click="pickWindow(w.d)"
         >
-          {{ w.label }}
+          {{ t(w.label) }}
         </button>
       </div>
     </section>
 
-    <p v-if="pageError" class="notice">{{ pageError }}</p>
+    <p v-if="pageError" class="notice">{{ errorDetailText(pageError) }}</p>
 
     <!-- 段全挂且不是「观察模式」：给整页结论（观察模式不进这里，逐段显示 — 更有用） -->
     <div v-if="data && data.available !== 'ok' && data.available !== 'not_ready'" class="card empty-card">
-      <p class="empty-title">取不到统计数据</p>
-      <p class="muted">{{ data.reason ?? 'bot 当前不可达' }}</p>
-      <p class="muted small">统计全部来自 bot 的交易接口，进程停止时只能看本地的已平仓明细。</p>
+      <p class="empty-title">{{ t('取不到统计数据') }}</p>
+      <p class="muted">{{ data.reason === null ? t('bot 当前不可达') : errorDetailText({ detail: data.reason, status: data.status }) }}</p>
+      <p class="muted small">{{ t('统计全部来自 bot 的交易接口，进程停止时只能看本地的已平仓明细。') }}</p>
     </div>
 
     <template v-else>
@@ -251,22 +256,22 @@ onMounted(() => void load())
       <section class="card kpis fade-up">
         <template v-if="all">
           <div class="kpi">
-            <span class="k">已实现盈亏</span>
+            <span class="k">{{ t('已实现盈亏') }}</span>
             <div class="v num" :class="tone(all.profit_closed_coin ?? null)">
               {{ signed(all.profit_closed_coin ?? null) }}
               <span class="cur">{{ currency }}</span>
             </div>
-            <span class="hint">累计已平仓</span>
+            <span class="hint">{{ t('累计已平仓') }}</span>
           </div>
           <div class="kpi">
-            <span class="k">胜率</span>
+            <span class="k">{{ t('胜率') }}</span>
             <div class="v num">{{ winrate === null ? '—' : pct(winrate, 1, false) }}</div>
             <span class="hint">
-              {{ all.winning_trades ?? '—' }} 胜 / {{ all.losing_trades ?? '—' }} 负
+              {{ t('{w} 胜 / {l} 负', { w: all.winning_trades ?? '—', l: all.losing_trades ?? '—' }) }}
             </span>
           </div>
           <div class="kpi">
-            <span class="k">已平仓笔数</span>
+            <span class="k">{{ t('已平仓笔数') }}</span>
             <div class="v num">{{ tradeCount ?? '—' }}</div>
             <span class="hint">avg {{ all.avg_duration ?? '—' }}</span>
           </div>
@@ -276,17 +281,17 @@ onMounted(() => void load())
             <span class="hint">Sharpe {{ all.sharpe != null ? all.sharpe.toFixed(2) : '—' }}</span>
           </div>
           <div class="kpi">
-            <span class="k">最大回撤</span>
+            <span class="k">{{ t('最大回撤') }}</span>
             <div class="v num down">
               {{ all.max_drawdown != null ? pct(-Math.abs(all.max_drawdown) * 100, 2, false) : '—' }}
             </div>
-            <span class="hint">历史峰值到谷底</span>
+            <span class="hint">{{ t('历史峰值到谷底') }}</span>
           </div>
         </template>
         <div v-else class="seg-empty">
           <span class="seg-dash num">—</span>
           <span class="seg-note" :class="{ warn: !segSoft('profit') }">
-            {{ SEGMENT_LABELS.profit }}：{{ segNote('profit') }}
+            {{ t(SEGMENT_LABELS.profit) }}：{{ segNote('profit') }}
           </span>
         </div>
       </section>
@@ -294,7 +299,7 @@ onMounted(() => void load())
       <section class="grid">
         <!-- ② 按币对 -->
         <div class="card panel">
-          <h2 class="panel-title">按币对盈亏{{ unitSuffix }}</h2>
+          <h2 class="panel-title">{{ t('按币对盈亏{n}', { n: unitSuffix }) }}</h2>
           <div v-if="pairRows.length" class="bars">
             <div v-for="r in pairRows" :key="r.pair" class="barrow">
               <span class="pair mono">{{ r.pair.replace('/USDT:USDT', '') }}</span>
@@ -313,14 +318,14 @@ onMounted(() => void load())
 
         <!-- ③ 出场原因 -->
         <div class="card panel">
-          <h2 class="panel-title">出场原因</h2>
+          <h2 class="panel-title">{{ t('出场原因') }}</h2>
           <table v-if="exitRows.length" class="tbl">
             <thead>
               <tr>
-                <th>原因</th>
-                <th class="right">胜</th>
-                <th class="right">负</th>
-                <th class="right">胜率</th>
+                <th>{{ t('原因') }}</th>
+                <th class="right">{{ t('胜') }}</th>
+                <th class="right">{{ t('负') }}</th>
+                <th class="right">{{ t('胜率') }}</th>
               </tr>
             </thead>
             <tbody>
@@ -342,10 +347,10 @@ onMounted(() => void load())
       <!-- ④⑤⑥ 标签三段：入场 / 出场 / 组合 -->
       <section class="grid three">
         <div class="card panel">
-          <h2 class="panel-title">入场标签</h2>
+          <h2 class="panel-title">{{ t('入场标签') }}</h2>
           <table v-if="entryRows.length" class="tbl">
             <thead>
-              <tr><th>标签</th><th class="right">笔数</th><th class="right">盈亏{{ unitSuffix }}</th></tr>
+              <tr><th>{{ t('标签') }}</th><th class="right">{{ t('笔数') }}</th><th class="right">{{ t('盈亏{n}', { n: unitSuffix }) }}</th></tr>
             </thead>
             <tbody>
               <tr v-for="(r, i) in entryRows" :key="`e-${i}`">
@@ -359,10 +364,10 @@ onMounted(() => void load())
         </div>
 
         <div class="card panel">
-          <h2 class="panel-title">出场标签</h2>
+          <h2 class="panel-title">{{ t('出场标签') }}</h2>
           <table v-if="exitTagRows.length" class="tbl">
             <thead>
-              <tr><th>标签</th><th class="right">笔数</th><th class="right">盈亏{{ unitSuffix }}</th></tr>
+              <tr><th>{{ t('标签') }}</th><th class="right">{{ t('笔数') }}</th><th class="right">{{ t('盈亏{n}', { n: unitSuffix }) }}</th></tr>
             </thead>
             <tbody>
               <tr v-for="(r, i) in exitTagRows" :key="`x-${i}`">
@@ -376,7 +381,7 @@ onMounted(() => void load())
         </div>
 
         <div class="card panel">
-          <h2 class="panel-title">标签组合{{ unitSuffix }}</h2>
+          <h2 class="panel-title">{{ t('标签组合{n}', { n: unitSuffix }) }}</h2>
           <div v-if="mixRows.length" class="bars">
             <div v-for="(r, i) in mixRows.slice(0, 10)" :key="`m-${i}`" class="barrow narrow">
               <span class="pair mono" :title="tagLabel(r)">{{ tagLabel(r) }}</span>
@@ -396,10 +401,10 @@ onMounted(() => void load())
 
       <!-- ⑦ 日盈亏 -->
       <section class="card panel fade-up">
-        <h2 class="panel-title">日盈亏（最近 14 天）</h2>
+        <h2 class="panel-title">{{ t('日盈亏（最近 14 天）') }}</h2>
         <table v-if="dailyRows.length" class="tbl">
           <thead>
-            <tr><th>日期 (UTC)</th><th class="right">笔数</th><th class="right">盈亏{{ unitSuffix }}</th></tr>
+            <tr><th>{{ t('日期 (UTC)') }}</th><th class="right">{{ t('笔数') }}</th><th class="right">{{ t('盈亏{n}', { n: unitSuffix }) }}</th></tr>
           </thead>
           <tbody>
             <tr v-for="d in dailyRows" :key="d.date">
@@ -414,12 +419,12 @@ onMounted(() => void load())
 
       <!-- ⑧⑨ 周 / 月 -->
       <section class="card panel fade-up">
-        <h2 class="panel-title">周期盈亏</h2>
+        <h2 class="panel-title">{{ t('周期盈亏') }}</h2>
         <div class="periods">
           <div class="period">
-            <span class="muted small">按周（近 12 周）</span>
+            <span class="muted small">{{ t('按周（近 12 周）') }}</span>
             <div v-if="weeklyRows.length" class="cols">
-              <div v-for="p in weeklyRows" :key="`w-${p.date}`" class="col" :title="`${p.date}  ${signed(p.abs_profit)} (${p.trade_count} 笔)`">
+              <div v-for="p in weeklyRows" :key="`w-${p.date}`" class="col" :title="t('{date}  {profit} ({n} 笔)', { date: p.date, profit: signed(p.abs_profit), n: p.trade_count })">
                 <div class="colplot">
                   <i class="upbar" :style="{ height: p.abs_profit >= 0 ? barHeight(p.abs_profit, weeklyMax) : '0' }" />
                   <i class="downbar" :style="{ height: p.abs_profit < 0 ? barHeight(p.abs_profit, weeklyMax) : '0' }" />
@@ -431,9 +436,9 @@ onMounted(() => void load())
           </div>
 
           <div class="period">
-            <span class="muted small">按月（近 12 月）</span>
+            <span class="muted small">{{ t('按月（近 12 月）') }}</span>
             <div v-if="monthlyRows.length" class="cols">
-              <div v-for="p in monthlyRows" :key="`m-${p.date}`" class="col" :title="`${p.date}  ${signed(p.abs_profit)} (${p.trade_count} 笔)`">
+              <div v-for="p in monthlyRows" :key="`m-${p.date}`" class="col" :title="t('{date}  {profit} ({n} 笔)', { date: p.date, profit: signed(p.abs_profit), n: p.trade_count })">
                 <div class="colplot">
                   <i class="upbar" :style="{ height: p.abs_profit >= 0 ? barHeight(p.abs_profit, monthlyMax) : '0' }" />
                   <i class="downbar" :style="{ height: p.abs_profit < 0 ? barHeight(p.abs_profit, monthlyMax) : '0' }" />
@@ -445,7 +450,7 @@ onMounted(() => void load())
           </div>
         </div>
         <p class="muted small note">
-          柱子只表示幅度，正负分列在零轴上下；悬停可看具体金额与笔数。
+          {{ t('柱子只表示幅度，正负分列在零轴上下；悬停可看具体金额与笔数。') }}
         </p>
       </section>
     </template>

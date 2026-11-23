@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { t } from '../i18n'
 import { computed } from 'vue'
 import type { OverviewTotals } from '../api/types'
 import { money, signed, tone } from '../composables/useFormat'
@@ -23,61 +24,61 @@ const equityTitle = 'bot 权益（/balance.total_bot）：只算这台 bot 自�
  * 四档互斥由 `mapOverviewTotals()` 保证，这里只做翻译。
  */
 const state = computed<{ label: string; tone: 'up' | 'warn' | 'muted' }>(() => {
-  const t = props.totals
-  if (t.unreachable > 0) return { label: '不可达', tone: 'warn' }
-  if (t.running > 0) return { label: '正在交易', tone: 'up' }
-  if (t.paused > 0) return { label: '已暂停', tone: 'warn' }
-  return { label: '未在交易', tone: 'muted' }
+  const totals = props.totals
+  if (totals.unreachable > 0) return { label: t('不可达'), tone: 'warn' }
+  if (totals.running > 0) return { label: t('正在交易'), tone: 'up' }
+  if (totals.paused > 0) return { label: t('已暂停'), tone: 'warn' }
+  return { label: t('未在交易'), tone: 'muted' }
 })
 </script>
 
 <template>
   <section class="card strip fade-up">
     <div class="hero">
-      <span class="eyebrow" :title="equityTitle">总权益</span>
-      <div class="big num" :title="equityTitle">
+      <span class="eyebrow" :title="t(equityTitle)">{{ t('总权益') }}</span>
+      <div class="big num" :title="t(equityTitle)">
         {{ money(props.totals.equity_total) }}
         <span v-if="props.totals.equity_total !== null" class="cur">
           {{ props.totals.equity_currency ?? '' }}
         </span>
       </div>
-      <span class="hint">含未平仓浮动 · 不含手动划入</span>
+      <span class="hint">{{ t('含未平仓浮动 · 不含手动划入') }}</span>
     </div>
 
     <div class="stats">
       <div class="cell">
-        <span class="k" title="按 UTC 自然日聚合；Freqtrade 以 UTC 切分交易日">今日 (UTC)</span>
+        <span class="k" :title="t('按 UTC 自然日聚合；Freqtrade 以 UTC 切分交易日')">{{ t('今日 (UTC)') }}</span>
         <div class="mid num" :class="tone(props.totals.today_realized)">
           {{ signed(props.totals.today_realized) }}
         </div>
-        <span class="hint" :title="props.totals.today_complete ? '' : '未拿到今日数据，合计不完整'">
-          已平仓
-          <template v-if="!props.totals.today_complete">· 不完整</template>
+        <span class="hint" :title="props.totals.today_complete ? '' : t('未拿到今日数据，合计不完整')">
+          {{ t('已平仓') }}
+          <template v-if="!props.totals.today_complete">· {{ t('不完整') }}</template>
         </span>
       </div>
 
       <div class="cell">
-        <span class="k" title="已平仓净盈亏累计">已实现</span>
+        <span class="k" :title="t('已平仓净盈亏累计')">{{ t('已实现') }}</span>
         <div class="mid num" :class="tone(props.totals.realized_pnl)">
           {{ signed(props.totals.realized_pnl) }}
         </div>
-        <span class="hint">累计</span>
+        <span class="hint">{{ t('累计') }}</span>
       </div>
 
       <div class="cell">
-        <span class="k" title="未平仓浮动">未实现</span>
+        <span class="k" :title="t('未平仓浮动')">{{ t('未实现') }}</span>
         <div class="mid num" :class="tone(props.totals.unrealized_pnl)">
           {{ signed(props.totals.unrealized_pnl) }}
         </div>
-        <span class="hint">浮动</span>
+        <span class="hint">{{ t('浮动') }}</span>
       </div>
 
       <div class="cell">
-        <span class="k" title="bot 当前是否在交易（不做启停操作，只看状态）">交易状态</span>
+        <span class="k" :title="t('bot 当前是否在交易（不做启停操作，只看状态）')">{{ t('交易状态') }}</span>
         <div class="mid" :class="`tone-${state.tone}`">{{ state.label }}</div>
         <span class="hint counts">
           <!-- 0 与 null 不能混：null 是「不知道有几笔」，0 是「确实没有持仓」 -->
-          <RouterLink class="jump" to="/positions">{{ props.totals.open_trades ?? '—' }} 笔持仓</RouterLink>
+          <RouterLink class="jump" to="/positions">{{ t('{n} 笔持仓', { n: props.totals.open_trades ?? '—' }) }}</RouterLink>
         </span>
       </div>
     </div>

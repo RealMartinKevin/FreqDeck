@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { t } from '../i18n'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import * as echarts from 'echarts/core'
 import type { EChartsCoreOption } from 'echarts/core'
@@ -151,14 +152,14 @@ watch(
   { immediate: true },
 )
 
-watch([() => props.curve, selected], render)
+watch([() => props.curve, selected, () => props.series.map((s) => s.name).join('|')], render)
 </script>
 
 <template>
   <div class="wrap">
     <div ref="el" class="canvas" />
     <!-- 单人自用：超过 6 条只提示不阻止，替用户做决定比看清更难 -->
-    <p v-if="selectedCount > 6" class="hint over">同屏超过 6 条不好分辨，建议在图例里收敛到 6 条以内。</p>
+    <p v-if="selectedCount > 6" class="hint over">{{ t('同屏超过 6 条不好分辨，建议在图例里收敛到 6 条以内。') }}</p>
   </div>
 </template>
 

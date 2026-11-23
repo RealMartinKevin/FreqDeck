@@ -16,9 +16,11 @@
  * 已整批删除：进程不由本系统管理，也没有"再加一台"这回事了。
  */
 
+import { t } from '../i18n'
 import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { ApiFailure, NetworkError, UnauthorizedError, api, fetchConfig } from '../api/client'
+import { ApiFailure, NetworkError, UnauthorizedError, api, errorDetailText, fetchConfig } from '../api/client'
+import type { ErrorDetailSource } from '../api/client'
 import type { CurvePoint, InstanceOverview, OverviewOut, PositionOut } from '../api/types'
 import { useAppMode } from '../composables/useAppMode'
 import { usePolling } from '../composables/usePolling'
@@ -41,7 +43,7 @@ const router = useRouter()
 const { badge, state: mode, isShell, isTrade, isSwitching, onModeSettled } = useAppMode()
 
 const overview = ref<OverviewOut | null>(null)
-const fetchError = ref<string | null>(null)
+const fetchError = ref<ErrorDetailSource>(null)
 const fetchedAt = ref(0)
 const now = ref(Date.now())
 const spinning = ref(false)
@@ -73,10 +75,11 @@ async function loadOverview(signal?: AbortSignal): Promise<void> {
     }
     if (error instanceof ApiFailure && (error.kind === 'aborted' || error.duringSwitch)) return
     if (error instanceof NetworkError) {
-      fetchError.value = '无法连接服务，请确认 freqtrade 进程在运行（正在重试）'
+      fetchError.value = t('无法连接服务，请确认 freqtrade 进程在运行（正在重试）')
       return
     }
-    fetchError.value = error instanceof Error ? error.message : '读取看板数据失败'
+    // 保留 ApiFailure 对象（含 status），渲染处用 errorDetailText 才能替换 {n}
+    fetchError.value = error instanceof ApiFailure ? error : t('读取看板数据失败')
   }
 }
 
@@ -99,9 +102,9 @@ usePolling(() => {
 }, 1_000)
 
 const updatedText = computed(() => {
-  if (!fetchedAt.value) return '正在获取数据…'
+  if (!fetchedAt.value) return t('正在获取数据…')
   const s = Math.max(0, Math.floor((now.value - fetchedAt.value) / 1000))
-  return s < 2 ? '刚刚更新' : `数据更新于 ${s} 秒前`
+  return s < 2 ? t('刚刚更新') : t('数据更新于 {n} 秒前', { n: s })
 })
 
 /* ------------------------------------------------------------------ *
@@ -125,17 +128,17 @@ const observeOnly = computed(
 )
 
 const observeTitle = computed(() =>
-  isShell.value ? '观察模式不读取交易数据' : '还没拿到交易数据',
+  isShell.value ? t('观察模式不读取交易数据') : t('还没拿到交易数据'),
 )
 
 const observeDetail = computed(() => {
   if (isShell.value) {
-    return '观察模式只跑 API 与界面，不连交易所、不产生交易数据，所以下面的数字一律显示 —。切到交易模式后这里才会画出权益与持仓。'
+    return t('观察模式只跑 API 与界面，不连交易所、不产生交易数据，所以下面的数字一律显示 —。切到交易模式后这里才会画出权益与持仓。')
   }
   if (isTrade.value && mode.tradingActive !== true) {
-    return '进程已在交易模式，但还没开始交易（可能在加载策略或等交易所响应）。这段时间拿不到交易数据，稍后会自动刷新。'
+    return t('进程已在交易模式，但还没开始交易（可能在加载策略或等交易所响应）。这段时间拿不到交易数据，稍后会自动刷新。')
   }
-  return '后端返回「未就绪」，暂时读不到交易数据。稍后会自动重试；持续如此请到运维页看日志。'
+  return t('后端返回「未就绪」，暂时读不到交易数据。稍后会自动重试；持续如此请到运维页看日志。')
 })
 
 /**
@@ -146,26 +149,30 @@ const observeDetail = computed(() => {
  *
  * `not_ready` 不算错误（观察模式的正常结果），已由 observeOnly 单独接管。
  */
-const backendError = computed<string | null>(() => {
+const backendError = computed<ErrorDetailSource>(() => {
   const error = inst.value?.error
   if (!error || error.kind === 'not_ready') return null
-  return error.detail || '读取交易数据失败'
+  // 带上 status，供 errorDetailText 把 {n} 换成真实 HTTP 码
+  return error.detail ? { detail: error.detail, status: error.status } : t('读取交易数据失败')
 })
 
-const errorText = computed<string | null>(() => fetchError.value ?? backendError.value)
+const errorText = computed<string | null>(() => {
+  const source = fetchError.value ?? backendError.value
+  return source === null || source === undefined ? null : errorDetailText(source)
+})
 
 /** 模式条的说明文案：模式名由 store 统一判定（徽章、弹窗读的是同一个函数） */
 const modeDetail = computed(() => {
-  if (!mode.loaded) return '正在读取 bot 状态…'
-  if (!mode.reachable) return '读不到 /app/info：进程可能正在重启或已退出。'
-  if (isShell.value) return '只运行 API 与界面，不连接交易所，也不产生交易数据。'
-  if (isTrade.value && mode.tradingActive !== true) return '已切到交易模式，正在等待开始交易。'
-  if (mode.dryRun === false) return '实盘：真实资金在交易，每一次下单都会成交。'
-  if (mode.dryRun === true) return '模拟盘（dry-run）：不涉及真实资金。'
-  return '已切到交易模式。'
+  if (!mode.loaded) return t('正在读取 bot 状态…')
+  if (!mode.reachable) return t('读不到 /app/info：进程可能正在重启或已退出。')
+  if (isShell.value) return t('只运行 API 与界面，不连接交易所，也不产生交易数据。')
+  if (isTrade.value && mode.tradingActive !== true) return t('已切到交易模式，正在等待开始交易。')
+  if (mode.dryRun === false) return t('实盘：真实资金在交易，每一次下单都会成交。')
+  if (mode.dryRun === true) return t('模拟盘（dry-run）：不涉及真实资金。')
+  return t('已切到交易模式。')
 })
 
-const switchCta = computed(() => (isTrade.value ? '返回观察模式' : '进入交易模式'))
+const switchCta = computed(() => (isTrade.value ? t('返回观察模式') : t('进入交易模式')))
 
 /**
  * 密钥未填的轻量提示：只在观察模式下有意义。
@@ -221,16 +228,18 @@ const curve = computed<CurvePoint[]>(() => {
 const series = computed<{ id: string; name: string; equity: number | null }[]>(() => {
   const current = inst.value
   if (!current) return []
-  return [{ id: current.id, name: current.name, equity: current.equity_bot }]
+  // 兜底名 '本机 Bot' 是中文原文（数据层保留 key），在这里的渲染路径翻译；
+  // 后端返回的真实 bot 名不进英文表，t() 会原样透出
+  return [{ id: current.id, name: t(current.name), equity: current.equity_bot }]
 })
 
 /** 有点、且至少一个点有值才画：全是 null 的图只剩坐标轴，比空态更让人困惑 */
 const hasCurve = computed(() => curve.value.some((point) => point.value !== null))
 
 const curveEmptyText = computed(() => {
-  if (observeOnly.value) return '观察模式不读取交易数据，切到交易模式后这里才会出现曲线。'
-  if (inst.value?.daily === null) return '拿不到每日盈亏数据，曲线暂时画不出来。'
-  return '近 30 天没有可用的数据点。'
+  if (observeOnly.value) return t('观察模式不读取交易数据，切到交易模式后这里才会出现曲线。')
+  if (inst.value?.daily === null) return t('拿不到每日盈亏数据，曲线暂时画不出来。')
+  return t('近 30 天没有可用的数据点。')
 })
 
 /* ------------------------------------------------------------------ *
@@ -241,10 +250,10 @@ const previewRows = computed<PositionOut[]>(() => (inst.value?.open_positions ??
 const openCount = computed<number | null>(() => inst.value?.open_trades ?? null)
 
 const previewEmptyText = computed(() => {
-  if (observeOnly.value) return '观察模式不读取持仓数据。'
-  if (inst.value?.open_positions === null) return '拿不到持仓数据（显示 — ，不等于没有持仓）。'
-  if (openCount.value === 0) return '当前没有未平仓持仓。'
-  return '没有可展示的持仓行。'
+  if (observeOnly.value) return t('观察模式不读取持仓数据。')
+  if (inst.value?.open_positions === null) return t('拿不到持仓数据（显示 — ，不等于没有持仓）。')
+  if (openCount.value === 0) return t('当前没有未平仓持仓。')
+  return t('没有可展示的持仓行。')
 })
 
 /** ISO Z → `MM-DD HH:mm`：只裁显示，不做时区换算（与「今日 (UTC)」同口径） */
@@ -296,7 +305,7 @@ onBeforeUnmount(() => {
       <!-- 1 模式条：一句话说清现在在干什么 + 唯一的模式入口（徽章在顶栏，这里不重复画） -->
       <section class="modebar card fade-up">
         <div class="modebar-main">
-          <span class="eyebrow">当前模式</span>
+          <span class="eyebrow">{{ t('当前模式') }}</span>
           <p class="modebar-title">
             <i class="dot" :class="`t-${badge.tone}`" aria-hidden="true" />
             {{ badge.label }}
@@ -318,9 +327,9 @@ onBeforeUnmount(() => {
           <path d="M12 9.5v4M12 16.6h.01" />
         </svg>
         <p class="notice-text">
-          还没填交易所密钥。观察模式不受影响，但切到交易模式会因为缺密钥而回退。
+          {{ t('还没填交易所密钥。观察模式不受影响，但切到交易模式会因为缺密钥而回退。') }}
         </p>
-        <button class="btn btn-secondary btn-sm" type="button" @click="goConfig">去配置</button>
+        <button class="btn btn-secondary btn-sm" type="button" @click="goConfig">{{ t('去配置') }}</button>
       </div>
 
       <StatePanel
@@ -328,7 +337,7 @@ onBeforeUnmount(() => {
         variant="inline"
         tone="error"
         :title="errorText"
-        action="重试"
+        :action="t('重试')"
         @action="refresh"
       />
 
@@ -356,7 +365,7 @@ onBeforeUnmount(() => {
           variant="inline"
           tone="info"
           :title="observeTitle"
-          action="切换模式"
+          :action="t('切换模式')"
           @action="openSwitch"
         >
           {{ observeDetail }}
@@ -368,8 +377,8 @@ onBeforeUnmount(() => {
         <!-- 5 权益曲线 -->
         <section class="block card stack">
           <header class="block-head">
-            <h2>权益曲线</h2>
-            <span class="block-sub">近 30 天 · 日末 bot 权益</span>
+            <h2>{{ t('权益曲线') }}</h2>
+            <span class="block-sub">{{ t('近 30 天 · 日末 bot 权益') }}</span>
           </header>
           <EquityCurveChart
             v-if="hasCurve"
@@ -384,24 +393,24 @@ onBeforeUnmount(() => {
         <!-- 6 持仓预览（前 5 行 + 查看全部） -->
         <section class="block card stack">
           <header class="block-head">
-            <h2>持仓预览</h2>
+            <h2>{{ t('持仓预览') }}</h2>
             <span class="block-sub num">
-              未平仓 {{ openCount ?? '—' }} 笔<template v-if="openCount !== null && openCount > PREVIEW_ROWS">
-                · 仅显示前 {{ PREVIEW_ROWS }} 行</template
+              {{ t('未平仓 {n} 笔', { n: openCount ?? '—' }) }}<template v-if="openCount !== null && openCount > PREVIEW_ROWS">
+                · {{ t('仅显示前 {n} 行', { n: PREVIEW_ROWS }) }}</template
               >
             </span>
-            <RouterLink class="block-link" to="/positions">查看全部</RouterLink>
+            <RouterLink class="block-link" to="/positions">{{ t('查看全部') }}</RouterLink>
           </header>
 
           <div v-if="previewRows.length" class="tbl-wrap">
             <table class="tbl">
               <thead>
                 <tr>
-                  <th scope="col">交易对</th>
-                  <th scope="col" class="r">开仓价</th>
-                  <th scope="col" class="r">当前价</th>
-                  <th scope="col" class="r">浮动</th>
-                  <th scope="col" class="r">开仓时间</th>
+                  <th scope="col">{{ t('交易对') }}</th>
+                  <th scope="col" class="r">{{ t('开仓价') }}</th>
+                  <th scope="col" class="r">{{ t('当前价') }}</th>
+                  <th scope="col" class="r">{{ t('浮动') }}</th>
+                  <th scope="col" class="r">{{ t('开仓时间') }}</th>
                 </tr>
               </thead>
               <tbody>
@@ -409,9 +418,9 @@ onBeforeUnmount(() => {
                   <td>
                     <span class="pair">{{ row.pair }}</span>
                     <span class="side" :class="row.side === 'short' ? 's-short' : 's-long'">
-                      {{ row.side === 'short' ? '空' : '多' }}
+                      {{ row.side === 'short' ? t('空') : t('多') }}
                     </span>
-                    <span v-if="row.has_open_order" class="tag">有挂单</span>
+                    <span v-if="row.has_open_order" class="tag">{{ t('有挂单') }}</span>
                   </td>
                   <td class="r num">{{ price(row.open_rate) }}</td>
                   <td class="r num">{{ price(row.current_rate) }}</td>

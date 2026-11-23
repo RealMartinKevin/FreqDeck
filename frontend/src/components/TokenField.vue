@@ -14,6 +14,7 @@
  *     但刷新/离开页面后不復存在。
  */
 
+import { t } from '../i18n'
 import { computed, ref, watch } from 'vue'
 import { isRedacted } from '../api/ft/normalize'
 
@@ -36,8 +37,8 @@ const dismissed = ref(false)
 const current = computed(() => (typeof props.value === 'string' ? props.value : ''))
 const configured = computed(() => isRedacted(current.value))
 const stateLabel = computed(() => {
-  if (plain.value && !dismissed.value) return savedOnce.value ? '已保存（本次可见）' : '新令牌已生成（未保存）'
-  return configured.value ? '已配置' : '未配置'
+  if (plain.value && !dismissed.value) return savedOnce.value ? t('已保存（本次可见）') : t('新令牌已生成（未保存）')
+  return configured.value ? t('已配置') : t('未配置')
 })
 
 const stateTone = computed(() => {
@@ -112,7 +113,7 @@ function dismissPlain(): void {
 <template>
   <div class="field" :class="{ invalid: !!props.error }">
     <div class="row">
-      <span class="label">信号令牌</span>
+      <span class="label">{{ t('信号令牌') }}</span>
       <span class="state" :class="`t-${stateTone}`">
         <i class="dot" aria-hidden="true" />
         {{ stateLabel }}
@@ -120,27 +121,27 @@ function dismissPlain(): void {
     </div>
 
     <p class="hint">
-      外部系统用 `<code>X-Signal-Token</code>` 头调用 `/api/v1/signal/*`。后端只存掩码，明文只在生成时可见。
+      {{ t('外部系统用') }} `<code>X-Signal-Token</code>` {{ t('头调用') }} `/api/v1/signal/*`{{ t('。后端只存掩码，明文只在生成时可见。') }}
     </p>
 
     <div v-if="plain && !dismissed" class="plain">
       <code class="token">{{ plain }}</code>
       <div class="plain-actions">
         <button class="btn btn-secondary btn-sm" type="button" @click="copy">
-          {{ copied ? '已复制' : '复制' }}
+          {{ copied ? t('已复制') : t('复制') }}
         </button>
-        <button class="btn btn-secondary btn-sm" type="button" @click="dismissPlain">我已保存，隐藏</button>
+        <button class="btn btn-secondary btn-sm" type="button" @click="dismissPlain">{{ t('我已保存，隐藏') }}</button>
       </div>
       <p class="warnline">
-        {{ savedOnce ? '已保存。明文只在本页可见，刷新或离开后就拿不到了——请先复制。' : '点下方「保存」后生效；明文刷新即失，请先复制。' }}
+        {{ savedOnce ? t('已保存。明文只在本页可见，刷新或离开后就拿不到了——请先复制。') : t('点下方「保存」后生效；明文刷新即失，请先复制。') }}
       </p>
     </div>
 
     <div class="actions">
       <button class="btn btn-secondary btn-sm" type="button" @click="generate">
-        {{ configured ? '重新生成' : '生成令牌' }}
+        {{ configured ? t('重新生成') : t('生成令牌') }}
       </button>
-      <button v-if="configured" class="btn btn-secondary btn-sm" type="button" @click="clear">清除</button>
+      <button v-if="configured" class="btn btn-secondary btn-sm" type="button" @click="clear">{{ t('清除') }}</button>
     </div>
 
     <p v-if="props.error" class="err">{{ props.error }}</p>

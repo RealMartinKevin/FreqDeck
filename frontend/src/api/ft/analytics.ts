@@ -184,6 +184,7 @@ export async function fetchAnalytics(
     instance_name: botName(show),
     available,
     reason,
+    status: profitFailure?.status ?? null,
     days,
     weeks,
     months,

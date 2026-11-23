@@ -1,7 +1,10 @@
 <script setup lang="ts">
+import { t } from '../i18n'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { MAIN_ID, NetworkError, UnauthorizedError, api } from '../api/client'
+import { MAIN_ID, NetworkError, UnauthorizedError, api, errorDetailText } from '../api/client'
+import { ApiFailure } from '../api/client'
+import type { ErrorDetailSource } from '../api/client'
 import type {
   ClosedTradeRow,
   OpenPositionRow,
@@ -43,7 +46,7 @@ const limit = ref(num(query.limit, 100))
 const offset = ref(num(query.offset, 0))
 const positions = ref<PositionsOut | null>(null)
 const trades = ref<TradesOut | null>(null)
-const fetchError = ref<string | null>(null)
+const fetchError = ref<ErrorDetailSource>(null)
 const openBusy = ref(false)
 const closedBusy = ref(false)
 const fetchedAt = ref(0)
@@ -79,20 +82,20 @@ const windowTruncated = computed(() => trades.value?.reason === 'window_truncate
 const updatedText = computed(() => {
   if (tab.value === 'closed') {
     // 已平仓是历史查询，没有"实时"可言，显示查询时刻
-    return fetchedAt.value ? `查询于 ${new Date(fetchedAt.value).toTimeString().slice(0, 5)}` : ''
+    return fetchedAt.value ? t('查询于 {time}', { time: new Date(fetchedAt.value).toTimeString().slice(0, 5) }) : ''
   }
-  if (!fetchedAt.value) return '正在获取数据…'
+  if (!fetchedAt.value) return t('正在获取数据…')
   const seconds = Math.max(0, Math.floor((now.value - fetchedAt.value) / 1000))
-  return seconds < 2 ? '刚刚更新' : `数据更新于 ${seconds} 秒前`
+  return seconds < 2 ? t('刚刚更新') : t('数据更新于 {n} 秒前', { n: seconds })
 })
 
 const emptyOpenText = computed(() =>
   positions.value?.totals.complete
-    ? '当前没有未平仓持仓'
-    : '没有取到未平仓持仓：持仓查询没返回，合计也就只是空值',
+    ? t('当前没有未平仓持仓')
+    : t('没有取到未平仓持仓：持仓查询没返回，合计也就只是空值'),
 )
 const emptyClosedText = computed(() =>
-  filterDirty.value ? '没有符合条件的已平仓记录' : '还没有已平仓交易',
+  filterDirty.value ? t('没有符合条件的已平仓记录') : t('还没有已平仓交易'),
 )
 
 // 合计条四格：值、色、单位一起给，模板里就不必重复四遍同样的三元判断。
@@ -102,23 +105,28 @@ const stripCells = computed(() => {
   if (!totals) return []
   const cur = totals.equity_currency ?? ''
   return [
-    { key: 'u', label: '未实现', tone: tone(totals.unrealized_abs), unit: cur, text: signed(totals.unrealized_abs) },
-    { key: 'r', label: '已实现', tone: tone(totals.realized_abs), unit: cur, text: signed(totals.realized_abs) },
+    { key: 'u', label: t('未实现'), tone: tone(totals.unrealized_abs), unit: cur, text: signed(totals.unrealized_abs) },
+    { key: 'r', label: t('已实现'), tone: tone(totals.realized_abs), unit: cur, text: signed(totals.realized_abs) },
     {
       key: 'o',
-      label: '持仓',
+      label: t('持仓'),
       tone: '',
-      unit: totals.complete ? '' : '· 不完整',
-      text: totals.open_trades === null ? '—' : `${totals.open_trades} 笔`,
+      unit: totals.complete ? '' : t('· 不完整'),
+      text: totals.open_trades === null ? '—' : t('{n} 笔', { n: totals.open_trades }),
     },
-    { key: 'd', label: '数据', tone: '', unit: '', text: totals.complete ? '完整' : '不完整' },
+    { key: 'd', label: t('数据'), tone: '', unit: '', text: totals.complete ? t('完整') : t('不完整') },
   ]
 })
 
 function fail(e: unknown) {
   if (e instanceof UnauthorizedError) return void router.push('/login')
   // 保留上一次数据只做提示：轮询会继续重试，页面不白屏
-  fetchError.value = e instanceof NetworkError ? '无法连接交易接口，正在重试' : (e as Error).message
+  fetchError.value =
+    e instanceof NetworkError
+      ? t('无法连接交易接口，正在重试')
+      : e instanceof ApiFailure
+        ? e
+        : (e as Error).message
 }
 
 async function fetchPositions() {
@@ -230,7 +238,7 @@ function closeDetail() {
 const actionTarget = ref<OpenPositionRow | null>(null)
 const actionPending = ref<PositionAction | null>(null)
 const actionBusy = ref(false)
-const actionError = ref<string | null>(null)
+const actionError = ref<ErrorDetailSource>(null)
 
 const ACTION_TEXT: Record<PositionAction, { title: string; body: string; confirm: string }> = {
   force_exit: {
@@ -269,7 +277,7 @@ async function runAction(action: PositionAction) {
   try {
     const result = await api.positionAction(MAIN_ID, row.trade_id, action)
     if (!result.ok) {
-      actionError.value = result.error?.detail || '操作未成功'
+      actionError.value = result.error ?? t('操作未成功')
       return
     }
     actionTarget.value = null
@@ -278,7 +286,7 @@ async function runAction(action: PositionAction) {
     await fetchPositions()
   } catch (e) {
     if (e instanceof UnauthorizedError) return void router.push('/login')
-    actionError.value = e instanceof Error ? e.message : '操作失败'
+    actionError.value = e instanceof ApiFailure ? e : t('操作失败')
   } finally {
     actionBusy.value = false
   }
@@ -325,33 +333,33 @@ onMounted(() => {
 
     <main class="main">
       <div class="head">
-        <h1>持仓明细</h1>
+        <h1>{{ t('持仓明细') }}</h1>
         <div class="tabs" role="tablist">
           <button class="tab" :class="{ active: tab === 'open' }" type="button" role="tab"
             :aria-selected="tab === 'open'" @click="switchTab('open')">
-            未平仓<span v-if="positions" class="badge num">{{ positions.totals.open_trades ?? '—' }}</span>
+            {{ t('未平仓') }}<span v-if="positions" class="badge num">{{ positions.totals.open_trades ?? '—' }}</span>
           </button>
           <button class="tab" :class="{ active: tab === 'closed' }" type="button" role="tab"
             :aria-selected="tab === 'closed'" @click="switchTab('closed')">
-            已平仓
+            {{ t('已平仓') }}
           </button>
         </div>
       </div>
 
       <div v-if="fetchError" class="errorbar" role="alert">
-        <span class="msg">{{ fetchError }}</span>
-        <button class="btn btn-secondary btn-sm" type="button" @click="refresh">重试</button>
+        <span class="msg">{{ errorDetailText(fetchError) }}</span>
+        <button class="btn btn-secondary btn-sm" type="button" @click="refresh">{{ t('重试') }}</button>
       </div>
 
       <!-- 未平仓：实时数据，合计原样搬自看板 -->
       <section v-if="tab === 'open'">
         <!-- 观察模式：整块换空态。不显示红色错误——端点没坏，是 bot 没在交易 -->
-        <StatePanel v-if="shellMode || openNotReady" tone="info" title="未在交易模式">
-          <p>观察模式下进程不连接交易所，因此没有未平仓持仓。切到交易模式后这里才有数据。</p>
-          <button class="btn btn-primary btn-sm panel-act" type="button" @click="openModeDialog">切换模式</button>
+        <StatePanel v-if="shellMode || openNotReady" tone="info" :title="t('未在交易模式')">
+          <p>{{ t('观察模式下进程不连接交易所，因此没有未平仓持仓。切到交易模式后这里才有数据。') }}</p>
+          <button class="btn btn-primary btn-sm panel-act" type="button" @click="openModeDialog">{{ t('切换模式') }}</button>
         </StatePanel>
 
-        <StatePanel v-else-if="!positions" tone="muted" title="正在获取未平仓持仓…" />
+        <StatePanel v-else-if="!positions" tone="muted" :title="t('正在获取未平仓持仓…')" />
 
         <template v-else>
           <div class="strip card">
@@ -368,9 +376,9 @@ onMounted(() => {
 
       <!-- 已平仓：本地窗口 + 本地过滤 + 本地分页（上游 /trades 没有筛选参数） -->
       <section v-else>
-        <StatePanel v-if="shellMode || closedNotReady" tone="info" title="未在交易模式">
-          <p>观察模式下不读取交易数据——历史库里没有新增记录，读出来只会是旧快照。</p>
-          <button class="btn btn-primary btn-sm panel-act" type="button" @click="openModeDialog">切换模式</button>
+        <StatePanel v-if="shellMode || closedNotReady" tone="info" :title="t('未在交易模式')">
+          <p>{{ t('观察模式下不读取交易数据——历史库里没有新增记录，读出来只会是旧快照。') }}</p>
+          <button class="btn btn-primary btn-sm panel-act" type="button" @click="openModeDialog">{{ t('切换模式') }}</button>
         </StatePanel>
 
         <template v-else>
@@ -382,25 +390,25 @@ onMounted(() => {
 
           <!-- 窗口打满：筛选/分页只在最近 2000 笔内生效，这个限制不能藏起来 -->
           <StatePanel v-if="windowTruncated" class="table" variant="inline" tone="warn"
-            title="已加载最近 2000 笔，更早的记录未参与筛选">
-            上游 <code>/trades</code> 只接受 limit/offset，没有筛选参数，所以这里只能拉回窗口自己切。
-            更早的记录仍在库里，但上面的筛选与「共 N 条」都只覆盖这 2000 笔。
+            :title="t('已加载最近 2000 笔，更早的记录未参与筛选')">
+            {{ t('上游') }} <code>/trades</code> {{ t('只接受 limit/offset，没有筛选参数，所以这里只能拉回窗口自己切。') }}
+            {{ t('更早的记录仍在库里，但上面的筛选与「共 N 条」都只覆盖这 2000 笔。') }}
           </StatePanel>
 
           <ClosedTradesTable v-if="trades && closedReady" :result="trades" :instance-name="trades.instance_name"
             :busy="closedBusy" :empty-text="emptyClosedText" @page="offset = $event" @review="reviewClosed"
             @detail="openDetail" />
 
-          <StatePanel v-else-if="trades" tone="warn" :title="CLOSED_AVAIL[trades.available] ?? trades.available"
-            action="重试" @action="fetchTrades">
-            <span :title="trades.reason ?? ''">{{ trades.reason ?? '没有更多细节' }}</span>
+          <StatePanel v-else-if="trades" tone="warn" :title="t(CLOSED_AVAIL[trades.available] ?? trades.available)"
+            :action="t('重试')" @action="fetchTrades">
+            <span :title="trades.reason ?? ''">{{ t(trades.reason ?? '没有更多细节') }}</span>
           </StatePanel>
 
-          <StatePanel v-else tone="muted" title="正在读取历史库…" />
+          <StatePanel v-else tone="muted" :title="t('正在读取历史库…')" />
 
           <StatePanel v-if="trades && trades.schema_anomaly > 0" class="table" variant="inline" tone="warn"
-            :title="`有 ${trades.schema_anomaly} 笔记录的盈亏与 ROE 都取不到`">
-            这些行显示 — 而不是 0.00：0 会被读成"打平"，混进合计就是错账。
+            :title="t('有 {n} 笔记录的盈亏与 ROE 都取不到', { n: trades.schema_anomaly })">
+            {{ t('这些行显示 — 而不是 0.00：0 会被读成"打平"，混进合计就是错账。') }}
           </StatePanel>
         </template>
       </section>
@@ -409,51 +417,51 @@ onMounted(() => {
     <!-- 仓位操作：先选动作 → 再确认；两次点击之间能看到这笔仓位的摘要 -->
     <Modal :open="!!actionTarget" @close="closeAction">
       <template v-if="actionTarget">
-        <h2 class="modal-title">仓位操作</h2>
+        <h2 class="modal-title">{{ t('仓位操作') }}</h2>
         <dl class="brief">
           <div><dt>pair</dt><dd>{{ actionTarget.pair }}</dd></div>
-          <div><dt>方向</dt><dd>
-            {{ actionTarget.side === 'long' ? '做多' : '做空' }}
+          <div><dt>{{ t('方向') }}</dt><dd>
+            {{ actionTarget.side === 'long' ? t('做多') : t('做空') }}
             <span v-if="actionTarget.leverage !== null">· {{ actionTarget.leverage }}x</span>
           </dd></div>
-          <div><dt>开仓价</dt><dd class="num">{{ price(actionTarget.open_rate) }}</dd></div>
-          <div><dt>当前价</dt><dd class="num">{{ price(actionTarget.current_rate) }}</dd></div>
-          <div><dt>未实现</dt><dd class="num" :class="tone(actionTarget.unrealized_abs)">
+          <div><dt>{{ t('开仓价') }}</dt><dd class="num">{{ price(actionTarget.open_rate) }}</dd></div>
+          <div><dt>{{ t('当前价') }}</dt><dd class="num">{{ price(actionTarget.current_rate) }}</dd></div>
+          <div><dt>{{ t('未实现') }}</dt><dd class="num" :class="tone(actionTarget.unrealized_abs)">
             {{ signed(actionTarget.unrealized_abs) }}<span class="unit">{{ actionTarget.stake_currency ?? '' }}</span>
           </dd></div>
           <div><dt>trade_id</dt><dd class="num">{{ actionTarget.trade_id }}</dd></div>
         </dl>
 
         <template v-if="!actionPending">
-          <p class="hint">选择要对这笔持仓执行的操作。两项都会立即下发到 bot，不可撤销。</p>
+          <p class="hint">{{ t('选择要对这笔持仓执行的操作。两项都会立即下发到 bot，不可撤销。') }}</p>
           <div class="modal-actions">
-            <button class="btn btn-secondary" type="button" @click="closeAction">取消</button>
+            <button class="btn btn-secondary" type="button" @click="closeAction">{{ t('取消') }}</button>
             <button class="btn btn-danger" type="button" @click="actionPending = 'force_exit'">
-              强制平仓
+              {{ t('强制平仓') }}
             </button>
             <button class="btn btn-secondary" type="button" :disabled="!actionTarget.has_open_order"
-              :title="actionTarget.has_open_order ? '' : '该笔交易当前没有未成交挂单'"
+              :title="actionTarget.has_open_order ? '' : t('该笔交易当前没有未成交挂单')"
               @click="actionPending = 'cancel_order'">
-              取消挂单
+              {{ t('取消挂单') }}
             </button>
           </div>
           <p v-if="!actionTarget.has_open_order" class="hint sub-hint">
-            这笔交易当前没有未成交挂单，所以「取消挂单」不可用。
+            {{ t('这笔交易当前没有未成交挂单，所以「取消挂单」不可用。') }}
           </p>
         </template>
 
         <template v-else>
           <div class="confirm" :class="{ danger: actionPending === 'force_exit' }">
-            <strong>{{ ACTION_TEXT[actionPending].title }}</strong>
-            <p>{{ ACTION_TEXT[actionPending].body }}</p>
+            <strong>{{ t(ACTION_TEXT[actionPending].title) }}</strong>
+            <p>{{ t(ACTION_TEXT[actionPending].body) }}</p>
           </div>
-          <p v-if="actionError" class="modal-err">{{ actionError }}</p>
+          <p v-if="actionError" class="modal-err">{{ errorDetailText(actionError) }}</p>
           <div class="modal-actions">
             <button class="btn btn-secondary" type="button" :disabled="actionBusy"
-              @click="actionPending = null; actionError = null">返回</button>
+              @click="actionPending = null; actionError = null">{{ t('返回') }}</button>
             <button class="btn" :class="actionPending === 'force_exit' ? 'btn-danger' : 'btn-primary'"
               type="button" :disabled="actionBusy" @click="runAction(actionPending)">
-              {{ actionBusy ? '执行中…' : ACTION_TEXT[actionPending].confirm }}
+              {{ actionBusy ? t('执行中…') : t(ACTION_TEXT[actionPending].confirm) }}
             </button>
           </div>
         </template>

@@ -17,6 +17,7 @@
 
 import { computed, reactive, ref } from 'vue'
 import { ApiFailure, FIELDS, buildDiff, fetchConfig, getAtPath, restartOnlyPaths, saveConfig, setAtPath } from '../api/client'
+import type { ErrorDetailSource } from '../api/client'
 import type { AppMode, ConfigFieldSpec } from '../api/types'
 // 掩码语义只从适配层取，不在这里再定义一份常量：两处定义迟早会漂移
 import { isRedacted } from '../api/ft/normalize'
@@ -52,7 +53,7 @@ function sameJson(a: unknown, b: unknown): boolean {
 export function useConfigForm() {
   const loading = ref(false)
   const saving = ref(false)
-  const loadError = ref<string | null>(null)
+  const loadError = ref<ErrorDetailSource>(null)
   const ready = ref(false)
 
   const draft = reactive<Record<string, unknown>>({})
@@ -114,7 +115,7 @@ export function useConfigForm() {
       const out = await fetchConfig()
       applySnapshot(out.config, out.mode, out.restart_only_paths ?? [])
     } catch (error) {
-      loadError.value = error instanceof ApiFailure ? error.detail : '读取配置失败'
+      loadError.value = error instanceof ApiFailure ? error : '读取配置失败'
     } finally {
       loading.value = false
     }

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { t } from '../i18n'
 import type { TradesFacets } from '../api/types'
 import { computed } from 'vue'
 
@@ -35,14 +36,14 @@ const dirty = computed(
 <template>
   <div class="bar">
     <label class="field">
-      <span class="label">平仓原因</span>
+      <span class="label">{{ t('平仓原因') }}</span>
       <select
         class="input sel"
         :value="props.exitReason"
         :disabled="props.busy"
         @change="emit('update:exitReason', ($event.target as HTMLSelectElement).value)"
       >
-        <option value="">全部</option>
+        <option value="">{{ t('全部') }}</option>
         <option v-for="value in props.facets.exit_reasons" :key="value" :value="value">{{ value }}</option>
       </select>
     </label>
@@ -55,13 +56,13 @@ const dirty = computed(
         :disabled="props.busy"
         @change="emit('update:pair', ($event.target as HTMLSelectElement).value)"
       >
-        <option value="">全部</option>
+        <option value="">{{ t('全部') }}</option>
         <option v-for="value in props.facets.pairs" :key="value" :value="value">{{ value }}</option>
       </select>
     </label>
 
     <label class="field">
-      <span class="label">平仓日期 (UTC)</span>
+      <span class="label">{{ t('平仓日期 (UTC)') }}</span>
       <span class="range">
         <input
           class="input sel"
@@ -82,7 +83,7 @@ const dirty = computed(
     </label>
 
     <label class="field">
-      <span class="label">每页</span>
+      <span class="label">{{ t('每页') }}</span>
       <select
         class="input sel"
         :value="String(props.limit)"
@@ -94,7 +95,7 @@ const dirty = computed(
     </label>
 
     <button class="btn btn-secondary btn-sm reset" type="button" :disabled="props.busy || !dirty" @click="emit('reset')">
-      重置
+      {{ t('重置') }}
     </button>
   </div>
 </template>

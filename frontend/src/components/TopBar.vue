@@ -3,7 +3,9 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api } from '../api/client'
 import { useAppMode } from '../composables/useAppMode'
+import { t } from '../i18n'
 import ModeBadge from './ModeBadge.vue'
+import LocaleSwitch from './LocaleSwitch.vue'
 
 const props = withDefaults(
   defineProps<{
@@ -28,6 +30,7 @@ onMounted(() => {
 })
 
 // 胶囊由路由表 meta.nav 生成：导航标签只写一次，加页面时不会漏改导航。
+// meta.nav 存的是中文原文（i18n key），渲染时才翻译，切换语言无需重建路由。
 // getRoutes() 保留注册顺序，因此这里的顺序 = router.ts 里的定义顺序。
 const navs = computed(() =>
   router
@@ -70,11 +73,13 @@ async function logout() {
   <header class="topbar">
     <div class="bar">
       <div class="brand-block">
-        <RouterLink class="brand" to="/">Freqtrade 控制台</RouterLink>
+        <RouterLink class="brand" to="/">{{ t('Freqtrade 控制台') }}</RouterLink>
+        <!-- 更新时间从 flex 流中移除，绝对定位在品牌名下方：不占用水平空间，
+             导航/工具区位置恒定，数字变长也不会把右侧菜单顶走 -->
         <span v-if="props.updated" class="updated num">{{ props.updated }}</span>
       </div>
 
-      <nav class="nav" aria-label="主导航">
+      <nav class="nav" :aria-label="t('主导航')">
         <RouterLink
           v-for="n in navs"
           :key="n.path"
@@ -83,7 +88,7 @@ async function logout() {
           :class="{ active: route.path === n.path }"
           :aria-current="route.path === n.path ? 'page' : undefined"
         >
-          {{ n.label }}
+          {{ t(n.label) }}
         </RouterLink>
       </nav>
 
@@ -91,7 +96,13 @@ async function logout() {
         <!-- 模式徽章常驻顶栏：任何页面都能一眼看出「现在到底在干什么」 -->
         <ModeBadge class="mode-badge" />
 
-        <button class="icon-btn" type="button" title="刷新" aria-label="刷新" @click="emit('refresh')">
+        <button
+          class="icon-btn"
+          type="button"
+          :title="t('刷新')"
+          :aria-label="t('刷新')"
+          @click="emit('refresh')"
+        >
           <svg :class="{ spin: props.busy }" viewBox="0 0 24 24" aria-hidden="true">
             <path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v4h-4" />
           </svg>
@@ -100,8 +111,8 @@ async function logout() {
         <button
           class="icon-btn theme"
           type="button"
-          :title="theme === 'dark' ? '切换到浅色' : '切换到深色'"
-          aria-label="切换主题"
+          :title="theme === 'dark' ? t('切换到浅色') : t('切换到深色')"
+          :aria-label="t('切换主题')"
           @click="toggleTheme"
         >
           <svg v-if="theme === 'dark'" viewBox="0 0 24 24" aria-hidden="true">
@@ -113,7 +124,11 @@ async function logout() {
           </svg>
         </button>
 
-        <button class="btn btn-secondary btn-sm" type="button" @click="logout">退出登录</button>
+        <LocaleSwitch class="locale" />
+
+        <button class="btn btn-secondary btn-sm" type="button" @click="logout">
+          {{ t('退出登录') }}
+        </button>
       </div>
     </div>
   </header>
@@ -135,16 +150,20 @@ async function logout() {
   align-items: center;
   gap: var(--space-md);
   max-width: 1180px;
-  height: 64px;
-  margin: 0 auto;
+  /* 高度自适应：有更新时间下标时两行内容（品牌+下标）总高约 40px，
+     由 min-height 直接容纳并垂直居中，导航胶囊 y 恒定不跳 */
+  min-height: 64px;
   padding: 0 var(--space-lg);
+  margin: 0 auto;
 }
 
 .brand-block {
+  /* 作为更新时间的定位锚点，但它自身仍参与 flex 流（只有品牌名占水平空间） */
+  position: relative;
   display: flex;
   align-items: baseline;
-  gap: var(--space-md);
   min-width: 0;
+  /* 两行内容块的实际高度，交给父级 .bar 的 align-items:center 垂直居中 */
 }
 
 /* 32px 的标题栏在数据页上会喧宾夺主，压到 21px 让数字成为视觉主体 */
@@ -152,15 +171,29 @@ async function logout() {
   font-size: 21px;
   font-weight: 600;
   letter-spacing: -0.02em;
+  line-height: 1.2;
   color: var(--text);
   text-decoration: none;
   white-space: nowrap;
 }
 
+/* 更新时间：绝对定位在品牌名正下方，作为品牌的下标副题。
+   脱离 flex 流 → 不占水平空间 → 右侧导航/工具区位置恒定，
+   数字位数变化（1s→10s→100s）也不会引起任何位移。
+   与品牌名右缘对齐；过长时向左截断，同样不推挤两侧。 */
 .updated {
-  font-size: 13px;
+  position: absolute;
+  top: 100%;
+  right: 0;
+  max-width: 240px;
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 12px;
+  line-height: 1;
   color: var(--text-tertiary);
   white-space: nowrap;
+  pointer-events: none;
 }
 
 .nav {
@@ -205,6 +238,11 @@ async function logout() {
 .mode-badge {
   flex: none;
   margin-right: 2px;
+}
+
+.locale {
+  flex: none;
+  margin: 0 2px;
 }
 
 .icon-btn {
@@ -266,9 +304,14 @@ async function logout() {
     font-size: 13px;
   }
 
-  /* 窄屏优先保住徽章与刷新：主题切换是纯装饰，挤掉它不影响任何判断 */
+  /* 窄屏优先保住徽章、刷新与语言切换：主题切换是纯装饰，挤掉它不影响任何判断 */
   .icon-btn.theme {
     display: none;
+  }
+
+  .btn-sm {
+    padding: 6px 10px;
+    font-size: 13px;
   }
 }
 </style>

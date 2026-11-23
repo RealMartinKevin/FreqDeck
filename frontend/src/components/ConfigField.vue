@@ -15,6 +15,7 @@
  * 必须由专门的控件保证，普通 input 一旦把 `***redacted***` 放进 value 就会出事。
  */
 
+import { t } from '../i18n'
 import { computed, onMounted, ref, watch } from 'vue'
 import type { ConfigFieldSpec } from '../api/types'
 import SecretField from './SecretField.vue'
@@ -126,7 +127,7 @@ function emitText(raw: string): void {
   if (props.field.kind === 'number') {
     const parsed = parseNumber(raw)
     if (parsed === null) {
-      localTip.value = raw.trim() ? '请输入数字' : '不能为空'
+      localTip.value = raw.trim() ? t('请输入数字') : t('不能为空')
       return
     }
     localTip.value = validateNumber(parsed)
@@ -141,19 +142,19 @@ function emitText(raw: string): void {
 
 function validateNumber(value: number): string | null {
   if (path.value === 'max_open_trades') {
-    if (!Number.isInteger(value) || (value !== -1 && value < 1)) return '只能是 -1（不限）或 ≥ 1 的整数'
+    if (!Number.isInteger(value) || (value !== -1 && value < 1)) return t('只能是 -1（不限）或 ≥ 1 的整数')
     return null
   }
   if (path.value === 'tradable_balance_ratio') {
-    if (!(value > 0) || value > 1) return '取值应在 (0, 1] 之间，如 0.99'
+    if (!(value > 0) || value > 1) return t('取值应在 (0, 1] 之间，如 0.99')
     return null
   }
   if (path.value === 'stoploss') {
-    if (!(value < 0) || value <= -1) return '止损应为负数，如 -0.1 表示 -10%'
+    if (!(value < 0) || value <= -1) return t('止损应为负数，如 -0.1 表示 -10%')
     return null
   }
   if (path.value === 'api_server.listen_port') {
-    if (!Number.isInteger(value) || value < 1 || value > 65535) return '端口应在 1-65535 之间'
+    if (!Number.isInteger(value) || value < 1 || value > 65535) return t('端口应在 1-65535 之间')
     return null
   }
   return null
@@ -180,7 +181,7 @@ function emitLines(raw: string): void {
     .filter((line) => line.length > 0)
   if (path.value === 'exchange.pair_whitelist') {
     const bad = lines.find((line) => !line.includes('/'))
-    localTip.value = bad ? `「${bad}」缺少斜杠，格式应为 BASE/QUOTE（如 BTC/USDT）。最终以后端校验为准` : null
+    localTip.value = bad ? t('「{bad}」缺少斜杠，格式应为 BASE/QUOTE（如 BTC/USDT）。最终以后端校验为准', { bad }) : null
   }
   emit('change', path.value, lines)
 }
@@ -203,7 +204,7 @@ function emitRoi(): void {
     .filter((row) => Number.isFinite(row.min) && Number.isFinite(row.roi))
 
   if (!numeric.some((row) => row.min === 0)) {
-    localTip.value = 'ROI 必须包含 0 分钟（持仓即开始生效的那一档）'
+    localTip.value = t('ROI 必须包含 0 分钟（持仓即开始生效的那一档）')
     return
   }
   localTip.value = null
@@ -252,10 +253,10 @@ function removeRow(index: number): void {
   <!-- 只读 -->
   <div v-else-if="props.field.kind === 'readonly'" class="field">
     <div class="head">
-      <span class="label">{{ props.field.label }}</span>
+      <span class="label">{{ t(props.field.label) }}</span>
       <span class="ro">{{ toText(props.value) || '—' }}</span>
     </div>
-    <p v-if="props.field.hint" class="hint">{{ props.field.hint }}</p>
+    <p v-if="props.field.hint" class="hint">{{ t(props.field.hint) }}</p>
   </div>
 
   <!-- 布尔 -->
@@ -263,20 +264,20 @@ function removeRow(index: number): void {
     <div class="head">
       <label class="label check">
         <input type="checkbox" :checked="boolValue" @change="emitBool(($event.target as HTMLInputElement).checked)" />
-        {{ props.field.label }}
+        {{ t(props.field.label) }}
       </label>
-      <span v-if="props.restartOnly" class="tag warn">需重启</span>
+      <span v-if="props.restartOnly" class="tag warn">{{ t('需重启') }}</span>
     </div>
-    <p v-if="props.field.hint" class="hint">{{ props.field.hint }}</p>
+    <p v-if="props.field.hint" class="hint">{{ t(props.field.hint) }}</p>
     <p v-if="props.error" class="err">{{ props.error }}</p>
   </div>
 
   <!-- 行列表（白名单 / 黑名单 / CORS） -->
   <div v-else-if="props.field.kind === 'lines'" class="field">
     <div class="head">
-      <span class="label">{{ props.field.label }}</span>
-      <span v-if="props.dirty" class="tag">已修改</span>
-      <span v-if="props.restartOnly" class="tag warn">需重启</span>
+      <span class="label">{{ t(props.field.label) }}</span>
+      <span v-if="props.dirty" class="tag">{{ t('已修改') }}</span>
+      <span v-if="props.restartOnly" class="tag warn">{{ t('需重启') }}</span>
     </div>
     <textarea
       class="input area"
@@ -286,7 +287,7 @@ function removeRow(index: number): void {
       :class="{ bad: !!props.error }"
       @input="emitLines(($event.target as HTMLTextAreaElement).value)"
     />
-    <p v-if="props.field.hint" class="hint">{{ props.field.hint }}</p>
+    <p v-if="props.field.hint" class="hint">{{ t(props.field.hint) }}</p>
     <p v-if="localTip" class="tip">{{ localTip }}</p>
     <p v-if="props.error" class="err">{{ props.error }}</p>
   </div>
@@ -294,13 +295,13 @@ function removeRow(index: number): void {
   <!-- ROI 行编辑器 -->
   <div v-else-if="props.field.kind === 'roi'" class="field">
     <div class="head">
-      <span class="label">{{ props.field.label }}</span>
-      <span v-if="props.dirty" class="tag">已修改</span>
+      <span class="label">{{ t(props.field.label) }}</span>
+      <span v-if="props.dirty" class="tag">{{ t('已修改') }}</span>
     </div>
     <div class="roi">
       <div class="roi-head">
-        <span>持仓分钟</span>
-        <span>收益率</span>
+        <span>{{ t('持仓分钟') }}</span>
+        <span>{{ t('收益率') }}</span>
         <span />
       </div>
       <div v-for="(row, index) in rows" :key="index" class="roi-row">
@@ -333,12 +334,12 @@ function removeRow(index: number): void {
           :disabled="Number(row.min) === 0"
           @click="removeRow(index)"
         >
-          删除
+          {{ t('删除') }}
         </button>
       </div>
-      <button class="btn btn-secondary btn-sm add" type="button" @click="addRow">添加一档</button>
+      <button class="btn btn-secondary btn-sm add" type="button" @click="addRow">{{ t('添加一档') }}</button>
     </div>
-    <p v-if="props.field.hint" class="hint">{{ props.field.hint }}</p>
+    <p v-if="props.field.hint" class="hint">{{ t(props.field.hint) }}</p>
     <p v-if="localTip" class="tip">{{ localTip }}</p>
     <p v-if="props.error" class="err">{{ props.error }}</p>
   </div>
@@ -346,17 +347,17 @@ function removeRow(index: number): void {
   <!-- stake_amount：'unlimited' 与数字是两种语义，二选一 -->
   <div v-else-if="path === 'stake_amount'" class="field">
     <div class="head">
-      <span class="label">{{ props.field.label }}</span>
-      <span v-if="props.dirty" class="tag">已修改</span>
+      <span class="label">{{ t(props.field.label) }}</span>
+      <span v-if="props.dirty" class="tag">{{ t('已修改') }}</span>
     </div>
     <div class="choices">
       <label class="choice">
         <input type="radio" :checked="stakeUnlimited" @change="setStakeUnlimited(true)" />
-        unlimited（按最大持仓数均分余额）
+        unlimited{{ t('（按最大持仓数均分余额）') }}
       </label>
       <label class="choice">
         <input type="radio" :checked="!stakeUnlimited" @change="setStakeUnlimited(false)" />
-        固定金额
+        {{ t('固定金额') }}
       </label>
     </div>
     <input
@@ -368,31 +369,31 @@ function removeRow(index: number): void {
       :class="{ bad: !!props.error }"
       @input="emitText(($event.target as HTMLInputElement).value)"
     />
-    <p v-if="props.field.hint" class="hint">{{ props.field.hint }}</p>
+    <p v-if="props.field.hint" class="hint">{{ t(props.field.hint) }}</p>
     <p v-if="props.error" class="err">{{ props.error }}</p>
   </div>
 
   <!-- 下拉（异步来源失败 → 降级文本） -->
   <div v-else-if="props.field.kind === 'select' && !optionsFailed" class="field">
     <div class="head">
-      <span class="label">{{ props.field.label }}</span>
-      <span v-if="props.dirty" class="tag">已修改</span>
-      <span v-if="props.restartOnly" class="tag warn">需重启</span>
+      <span class="label">{{ t(props.field.label) }}</span>
+      <span v-if="props.dirty" class="tag">{{ t('已修改') }}</span>
+      <span v-if="props.restartOnly" class="tag warn">{{ t('需重启') }}</span>
     </div>
     <select class="input" :value="selected" @change="emitSelect(($event.target as HTMLSelectElement).value)">
-      <option v-if="!selected" value="">请选择</option>
+      <option v-if="!selected" value="">{{ t('请选择') }}</option>
       <option v-for="option in selectOptions" :key="option" :value="option">{{ option }}</option>
     </select>
-    <p v-if="props.field.hint" class="hint">{{ props.field.hint }}</p>
+    <p v-if="props.field.hint" class="hint">{{ t(props.field.hint) }}</p>
     <p v-if="props.error" class="err">{{ props.error }}</p>
   </div>
 
   <!-- text / number / 降级后的 select -->
   <div v-else class="field">
     <div class="head">
-      <span class="label">{{ props.field.label }}</span>
-      <span v-if="props.dirty" class="tag">已修改</span>
-      <span v-if="props.restartOnly" class="tag warn">需重启</span>
+      <span class="label">{{ t(props.field.label) }}</span>
+      <span v-if="props.dirty" class="tag">{{ t('已修改') }}</span>
+      <span v-if="props.restartOnly" class="tag warn">{{ t('需重启') }}</span>
     </div>
     <input
       class="input"
@@ -404,7 +405,7 @@ function removeRow(index: number): void {
       autocomplete="off"
       @input="emitText(($event.target as HTMLInputElement).value)"
     />
-    <p v-if="props.field.hint" class="hint">{{ props.field.hint }}</p>
+    <p v-if="props.field.hint" class="hint">{{ t(props.field.hint) }}</p>
     <p v-if="localTip" class="tip">{{ localTip }}</p>
     <p v-if="props.error" class="err">{{ props.error }}</p>
   </div>

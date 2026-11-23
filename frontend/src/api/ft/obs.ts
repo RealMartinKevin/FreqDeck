@@ -128,6 +128,7 @@ export async function fetchLogs(instanceId: string, query: LogsQuery = {}, signa
       instance_name: instanceName,
       available: availabilityOf(failure),
       reason: failure?.detail ?? '读取日志失败',
+      status: failure?.status ?? null,
       lines: [],
       total: 0,
       limit,
@@ -157,6 +158,7 @@ export async function fetchSysinfo(instanceId: string, signal?: AbortSignal): Pr
       instance_name: instanceName,
       available: availabilityOf(failure),
       reason: failure?.detail ?? '读取系统信息失败',
+      status: failure?.status ?? null,
       sysinfo: null,
     }
   }
@@ -231,6 +233,7 @@ export async function fetchStrategy(instanceId: string, name?: string, signal?: 
       instance_name: instanceName,
       available: availabilityOf(failure),
       reason: failure?.detail ?? '读取策略信息失败',
+      status: failure?.status ?? null,
       strategy: strategyName,
       info: null,
     }
@@ -284,6 +287,7 @@ export async function fetchPairlist(instanceId: string, signal?: AbortSignal): P
     instance_name: instanceName,
     available: allFailed ? availabilityOf(first.failure) : 'ok',
     reason: allFailed ? (first.failure?.detail ?? '读取选币信息失败') : null,
+    status: allFailed ? (first.failure?.status ?? null) : null,
     whitelist: Array.isArray(whitelist?.whitelist) ? whitelist.whitelist : [],
     // 上游叫 method，契约叫 whitelist_method：改名只在这一行
     whitelist_method: Array.isArray(whitelist?.method) ? whitelist.method : [],
@@ -311,6 +315,7 @@ export async function fetchShowConfig(instanceId: string, signal?: AbortSignal):
       instance_name: instanceName,
       available: availabilityOf(failure),
       reason: failure?.detail ?? '读取运行配置失败',
+      status: failure?.status ?? null,
       config: null,
     }
   }

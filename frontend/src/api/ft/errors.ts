@@ -11,6 +11,8 @@
  * 不判断数字。数字留在 `status` 里给少数需要它的地方（如 K 线 400 → 「重选交易对」）。
  */
 
+import { t } from '../../i18n'
+
 export type ErrorKind =
   /** 不算错误（占位，便于 Record<ErrorKind, string> 有完整文案表） */
   | 'ok'
@@ -39,6 +41,49 @@ export const ERROR_TEXT: Record<ErrorKind, string> = {
   network: '无法连接服务，请确认 freqtrade 进程在运行',
   server_error: '服务内部错误',
   aborted: '请求已取消',
+}
+
+/**
+ * 错误文案的**响应式取法**：内部调用 t()，`detail` 里装的是中文原文（key），
+ * 只有走到这里才翻译成当前语言。放在 computed / 模板等渲染路径中调用会随语言切换重算。
+ *
+ * 注意：backend 原文（`ApiFailure.raw` / `instance.last_error` 等）不要传进来，
+ * 那些要保持原样展示。这里只处理本模块自己生成的中文文案。
+ */
+export function errorText(kind: ErrorKind): string {
+  return t(ERROR_TEXT[kind] ?? kind)
+}
+
+/**
+ * 动态 HTTP 文案的**原始 key**（不含具体数字）。数字在渲染时由 `errorDetailText`
+ * 用 `status` 填入 `{n}`——绝不在归一化阶段烘焙具体数字，否则英文表按 `{n}` 收录的
+ * 词条匹配不上，会掉回中文原文。
+ */
+export const ERROR_DETAIL_TEMPLATE = {
+  invalid: '请求参数不合法（HTTP {n}）',
+  serverError: '服务内部错误（HTTP {n}）',
+  requestFailed: '请求失败（HTTP {n}）',
+} as const
+
+/**
+ * 错误展示文案的**响应式取法**。兼容三种入参：
+ *   - `ApiFailure`（自带 detail + status）；
+ *   - 拍平后的 `{ detail, status }`（数据层 reason/error 字段补了 status 后即此形态）；
+ *   - 纯字符串 key（没有可用 status 时，如网络错误/静态文案）。
+ *
+ * `t()` 对不含 `{n}` 的 key 会忽略 params，所以所有静态中文 key 走同一函数也安全；
+ * 后端原文（RPCException 的 error 文本等）不进英文表，t() 天然 passthrough。
+ */
+export type ErrorDetailSource =
+  | { detail: string; status?: number | null }
+  | string
+  | null
+  | undefined
+
+export function errorDetailText(source: ErrorDetailSource, status?: number | null): string {
+  if (source === null || source === undefined) return ''
+  if (typeof source === 'string') return t(source, { n: status })
+  return t(source.detail, { n: source.status ?? status })
 }
 
 export interface ApiFailureInit {
@@ -235,19 +280,19 @@ export function normalizeError(status: number | null, body: unknown, opts: Norma
 
   if (status === 400 || status === 409 || status === 422) {
     // 原文必须原样展示：配置页靠它把 invalid configuration 挂回具体分组/字段
-    const detail = detailFromBody(body) ?? `${ERROR_TEXT.invalid}（HTTP ${status}）`
+    const detail = detailFromBody(body) ?? ERROR_DETAIL_TEMPLATE.invalid
     return new ApiError(status, detail, { kind: 'invalid', raw, duringSwitch })
   }
 
   if (status >= 500) {
-    return new ApiError(status, `${ERROR_TEXT.server_error}（HTTP ${status}）`, {
+    return new ApiError(status, ERROR_DETAIL_TEMPLATE.serverError, {
       kind: 'server_error',
       raw,
       duringSwitch,
     })
   }
 
-  return new ApiError(status, `请求失败（HTTP ${status}）`, { kind: 'server_error', raw, duringSwitch })
+  return new ApiError(status, ERROR_DETAIL_TEMPLATE.requestFailed, { kind: 'server_error', raw, duringSwitch })
 }
 
 export interface ThrownOptions extends NormalizeOptions {

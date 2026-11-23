@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { t } from '../i18n'
 import { computed } from 'vue'
 import type { CandlesOut } from '../api/types'
 import StatePanel from './StatePanel.vue'
@@ -73,16 +74,16 @@ const view = computed<ReasonView | null>(() => {
   const known = REASONS[reason]
   if (known) {
     if (reason === 'timeframe_unavailable') {
-      const base = props.data?.base_timeframe ?? '未知'
-      return { ...known, detail: `当前配置的粒度是 ${base}，没有 ${props.data?.timeframe} 的数据可看。${known.detail}` }
+      const base = props.data?.base_timeframe ?? t('未知')
+      return { ...known, detail: t('当前配置的粒度是 {base}，没有 {tf} 的数据可看。{detail}', { base, tf: String(props.data?.timeframe), detail: t(known.detail) }) }
     }
     // 缺的列名才是用户能拿去改策略的信息，拼进同一条提示，不再叠第二个提示条
     if (reason === 'schema_mismatch' && missingText.value) {
-      return { ...known, detail: `${known.detail}缺少：${missingText.value}。` }
+      return { ...known, detail: t('{detail}缺少：{missing}。', { detail: t(known.detail), missing: missingText.value }) }
     }
     return known
   }
-  return { tone: 'error', title: '拉取 K 线失败', detail: reason, action: '重试', blocking: true }
+  return { tone: 'error', title: t('拉取 K 线失败'), detail: reason, action: t('重试'), blocking: true }
 })
 
 const supportLines = computed(() => {
@@ -106,50 +107,50 @@ function shortUtc(iso: string | null): string {
     <StatePanel
       v-if="view && view.blocking"
       :tone="view.tone"
-      :title="view.title"
-      :action="view.action"
+      :title="t(view.title)"
+      :action="t(view.action)"
       @action="emit('retry')"
     >
-      {{ view.detail }}
+      {{ t(view.detail) }}
     </StatePanel>
 
     <template v-else>
       <!-- 提示条不挡图：缺指标列时价格仍然要能看（E10） -->
-      <StatePanel v-if="view" variant="inline" :tone="view.tone" :title="view.title">
-        {{ view.detail }}
+      <StatePanel v-if="view" variant="inline" :tone="view.tone" :title="t(view.title)">
+        {{ t(view.detail) }}
       </StatePanel>
       <!-- 只缺 l2_* 时 reason 仍是 null：标记照画，只是少了归因信息，不能降级成空态 -->
       <StatePanel
         v-else-if="missingText"
         variant="inline"
         tone="warn"
-        title="这批数据缺少覆盖层需要的列"
+        :title="t('这批数据缺少覆盖层需要的列')"
       >
-        标记与价格照常绘制，但缺少：{{ missingText }}。策略可能改过指标名。
+        {{ t('标记与价格照常绘制，但缺少：{missing}。策略可能改过指标名。', { missing: missingText }) }}
       </StatePanel>
 
       <div v-if="data" class="line">
-        <span class="num">共 {{ data.scope.bar_count }} 根</span>
+        <span class="num">{{ t('共 {n} 根', { n: data.scope.bar_count }) }}</span>
         <span class="sep">·</span>
-        <span class="num">最早 {{ shortUtc(data.scope.earliest_time) }}</span>
+        <span class="num">{{ t('最早 {time}', { time: shortUtc(data.scope.earliest_time) }) }}</span>
         <span class="sep">·</span>
-        <span class="num">末根 {{ shortUtc(data.scope.latest_time) }} (UTC)</span>
+        <span class="num">{{ t('末根 {time} (UTC)', { time: shortUtc(data.scope.latest_time) }) }}</span>
         <span class="sep">·</span>
-        <span class="num">上游窗口 {{ data.scope.upstream_length }} 根</span>
-        <span v-if="data.scope.truncated" class="hint">· 上游只保留了最近 {{ data.scope.upstream_length }} 根</span>
-        <span v-if="ageSeconds !== null" class="age num">· 拉取于 {{ ageSeconds }}s 前</span>
+        <span class="num">{{ t('上游窗口 {n} 根', { n: data.scope.upstream_length }) }}</span>
+        <span v-if="data.scope.truncated" class="hint">· {{ t('上游只保留了最近 {n} 根', { n: data.scope.upstream_length }) }}</span>
+        <span v-if="ageSeconds !== null" class="age num">· {{ t('拉取于 {n}s 前', { n: ageSeconds ?? '' }) }}</span>
         <span v-if="data.limit_requested > data.limit_effective" class="hint">
-          · 已按 {{ data.limit_effective }} 根返回
+          · {{ t('已按 {n} 根返回', { n: data.limit_effective }) }}
         </span>
       </div>
 
       <div v-if="showLegend" class="legend">
-        <span class="key"><i class="dot up" />开仓 / 平空</span>
-        <span class="key"><i class="dot down" />平仓 / 开空</span>
+        <span class="key"><i class="dot up" />{{ t('开仓 / 平空') }}</span>
+        <span class="key"><i class="dot down" />{{ t('平仓 / 开空') }}</span>
         <span v-for="line in supportLines" :key="line" class="key">
           <i class="dash" />{{ line }}
         </span>
-        <span v-if="isDerived" class="muted">派生视图（{{ data?.derived_from }} → {{ data?.timeframe }}）不含标记</span>
+        <span v-if="isDerived" class="muted">{{ t('派生视图（{from} → {to}）不含标记', { from: data?.derived_from ?? '', to: data?.timeframe ?? '' }) }}</span>
       </div>
     </template>
   </section>

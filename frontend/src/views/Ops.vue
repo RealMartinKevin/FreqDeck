@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { MAIN_ID, NetworkError, UnauthorizedError, api } from '../api/client'
+import { MAIN_ID, NetworkError, UnauthorizedError, api, errorDetailText } from '../api/client'
+import { ApiFailure } from '../api/client'
+import type { ErrorDetailSource } from '../api/client'
 import type { LogLine, LogsOut, PairlistOut, ShowConfigOut, StrategyOut, SysinfoOut } from '../api/types'
 import { usePolling } from '../composables/usePolling'
 import TopBar from '../components/TopBar.vue'
+import { t } from '../i18n'
 
 type Tab = 'logs' | 'system' | 'strategy' | 'pairlist'
 /** 级别筛选是**阈值**语义（INFO+ = INFO 及以上），不是等值匹配 */
@@ -21,10 +24,15 @@ const strategy = ref<StrategyOut | null>(null)
 const pairlist = ref<PairlistOut | null>(null)
 
 // v-if="pairlist" 会把 v-else 分支里的 pairlist 窄化成 null，
-// 模板里再读 pairlist.reason 会被 TS 判成 never；走 computed 绕开这个窄化
-const pairlistReason = computed(() => pairlist.value?.reason ?? null)
+// 模板里再读 pairlist.reason 会被 TS 判成 never；走 computed 绕开这个窄化。
+// 带上 status 供 errorDetailText 把 {n} 换成真实 HTTP 码。
+const pairlistReason = computed<ErrorDetailSource>(() =>
+  !pairlist.value || pairlist.value.reason === null
+    ? null
+    : { detail: pairlist.value.reason, status: pairlist.value.status },
+)
 
-const pageError = ref<string | null>(null)
+const pageError = ref<ErrorDetailSource>(null)
 const busy = ref(false)
 const fetchedAt = ref(0)
 const now = ref(Date.now())
@@ -80,17 +88,19 @@ const TABS: { k: Tab; l: string }[] = [
 ]
 
 const updatedText = computed(() => {
-  if (!fetchedAt.value) return '正在获取…'
+  if (!fetchedAt.value) return t('正在获取…')
   const s = Math.max(0, Math.floor((now.value - fetchedAt.value) / 1000))
-  return s < 2 ? '刚刚更新' : `数据更新于 ${s} 秒前`
+  return s < 2 ? t('刚刚更新') : t('数据更新于 {n} 秒前', { n: s })
 })
 
-function handle(e: unknown, fallback: string): string | null {
+function handle(e: unknown, fallback: string): ErrorDetailSource {
   if (e instanceof UnauthorizedError) {
     void router.push('/login')
     return null
   }
-  return e instanceof NetworkError ? '无法连接交易接口' : (e as Error).message || fallback
+  if (e instanceof NetworkError) return t('无法连接交易接口')
+  if (e instanceof ApiFailure) return e
+  return (e as Error).message || fallback
 }
 
 /**
@@ -104,7 +114,7 @@ async function loadLogs() {
     pageError.value = null
     fetchedAt.value = Date.now()
   } catch (e) {
-    const msg = handle(e, '加载日志失败')
+    const msg = handle(e, t('加载日志失败'))
     if (msg) pageError.value = msg
   }
 }
@@ -127,7 +137,7 @@ async function loadTab() {
     }
     fetchedAt.value = Date.now()
   } catch (e) {
-    const msg = handle(e, '加载失败')
+    const msg = handle(e, t('加载失败'))
     if (msg) pageError.value = msg
   } finally {
     busy.value = false
@@ -205,7 +215,7 @@ function configGroups(cfg: Record<string, unknown> | null) {
 /** 对象/数组按 JSON 展开，标量原样；布尔值显示为「是/否」比 true/false 更好扫读 */
 function display(v: unknown): string {
   if (v === null || v === undefined) return '—'
-  if (typeof v === 'boolean') return v ? '是' : '否'
+  if (typeof v === 'boolean') return v ? t('是') : t('否')
   if (typeof v === 'object') return JSON.stringify(v)
   return String(v)
 }
@@ -241,27 +251,27 @@ watch(tab, () => void loadTab())
   <main class="page">
     <section class="card head fade-up">
       <div class="title-block">
-        <h1 class="page-title">运维</h1>
+        <h1 class="page-title">{{ t('运维') }}</h1>
         <p class="muted small">
-          日志 / 系统 / 策略 / 选币都不依赖交易模式，观察模式下照样能看——排查启动失败先看这里。
+          {{ t('日志 / 系统 / 策略 / 选币都不依赖交易模式，观察模式下照样能看——排查启动失败先看这里。') }}
         </p>
       </div>
 
-      <nav class="tabs" aria-label="运维视图">
+      <nav class="tabs" :aria-label="t('运维视图')">
         <button
-          v-for="t in TABS"
-          :key="t.k"
+          v-for="tabDef in TABS"
+          :key="tabDef.k"
           class="tab"
-          :class="{ on: tab === t.k }"
+          :class="{ on: tab === tabDef.k }"
           type="button"
-          @click="tab = t.k"
+          @click="tab = tabDef.k"
         >
-          {{ t.l }}
+          {{ t(tabDef.l) }}
         </button>
       </nav>
     </section>
 
-    <p v-if="pageError" class="notice">{{ pageError }}</p>
+    <p v-if="pageError" class="notice">{{ errorDetailText(pageError) }}</p>
 
     <!-- 日志 -->
     <section v-show="tab === 'logs'" class="card panel fade-up">
@@ -275,36 +285,36 @@ watch(tab, () => void loadTab())
             type="button"
             @click="level = l.key"
           >
-            {{ l.label }}
+            {{ t(l.label) }}
           </button>
         </div>
         <div class="meta">
           <span v-if="logs?.available === 'ok'" class="muted small num">
-            已显示 {{ visibleLines.length }} / 共 {{ logs.total }} 行<template v-if="filteredOut > 0">（级别筛掉 {{ filteredOut }} 行）</template>
+            {{ t('已显示 {n} / 共 {total} 行', { n: visibleLines.length, total: logs.total }) }}<template v-if="filteredOut > 0">{{ t('（级别筛掉 {n} 行）', { n: filteredOut }) }}</template>
           </span>
           <label class="toggle">
             <input v-model="autoRefresh" type="checkbox" />
-            <span>自动刷新</span>
+            <span>{{ t('自动刷新') }}</span>
           </label>
           <label class="toggle">
             <input v-model="followTail" type="checkbox" @change="stickToBottom" />
-            <span>跟随最新</span>
+            <span>{{ t('跟随最新') }}</span>
           </label>
         </div>
       </header>
 
       <div v-if="logs && logs.available !== 'ok'" class="empty">
-        <p class="empty-title">取不到日志</p>
-        <p class="muted">{{ logs.reason ?? 'bot 当前不可达' }}</p>
+        <p class="empty-title">{{ t('取不到日志') }}</p>
+        <p class="muted">{{ logs.reason === null ? t('bot 当前不可达') : errorDetailText({ detail: logs.reason, status: logs.status }) }}</p>
         <p v-if="logs.available === 'unsupported'" class="muted small">
-          该 bot 的 Freqtrade 版本可能没有日志端点，可以直接看 logfile。
+          {{ t('该 bot 的 Freqtrade 版本可能没有日志端点，可以直接看 logfile。') }}
         </p>
       </div>
 
       <div v-else-if="logs && visibleLines.length === 0" class="empty">
-        <p class="empty-title">没有匹配的日志</p>
+        <p class="empty-title">{{ t('没有匹配的日志') }}</p>
         <p class="muted">
-          {{ logs.lines.length === 0 ? '上游缓冲区暂时没有日志行。' : '当前级别筛选下没有记录，试试放宽级别。' }}
+          {{ logs.lines.length === 0 ? t('上游缓冲区暂时没有日志行。') : t('当前级别筛选下没有记录，试试放宽级别。') }}
         </p>
       </div>
 
@@ -320,16 +330,16 @@ watch(tab, () => void loadTab())
     <!-- 系统 -->
     <section v-show="tab === 'system'" class="grid fade-up">
       <div class="card panel">
-        <h2 class="panel-title">资源</h2>
+        <h2 class="panel-title">{{ t('资源') }}</h2>
         <template v-if="sysinfo && sysinfo.available === 'ok' && sysinfo.sysinfo">
           <div class="gauges">
             <div class="gauge">
-              <span class="muted small">CPU · {{ sysinfo.sysinfo.cpu_count ?? '—' }} 核</span>
+              <span class="muted small">{{ t('CPU · {n} 核', { n: sysinfo.sysinfo.cpu_count ?? '—' }) }}</span>
               <strong class="num">{{ pct(sysinfo.sysinfo.cpu_avg) }}</strong>
               <div class="bar"><i :style="{ width: `${Math.min(100, sysinfo.sysinfo.cpu_avg ?? 0)}%` }" /></div>
             </div>
             <div class="gauge">
-              <span class="muted small">内存</span>
+              <span class="muted small">{{ t('内存') }}</span>
               <strong class="num">{{ pct(sysinfo.sysinfo.ram_pct) }}</strong>
               <div class="bar"><i :style="{ width: `${Math.min(100, sysinfo.sysinfo.ram_pct ?? 0)}%` }" /></div>
             </div>
@@ -337,7 +347,7 @@ watch(tab, () => void loadTab())
 
           <div v-if="sysinfo.sysinfo.cpu_load_avg" class="load">
             <div class="loadrow">
-              <span class="muted small">系统负载</span>
+              <span class="muted small">{{ t('系统负载') }}</span>
               <span class="num">
                 1m {{ fmt2(sysinfo.sysinfo.cpu_load_avg['1m']) }}
                 · 5m {{ fmt2(sysinfo.sysinfo.cpu_load_avg['5m']) }}
@@ -345,21 +355,21 @@ watch(tab, () => void loadTab())
               </span>
             </div>
             <p class="muted small">
-              负载是「运行中 + 等待中」的进程数，除以核数才是相对压力；单看绝对值没意义。
+              {{ t('负载是「运行中 + 等待中」的进程数，除以核数才是相对压力；单看绝对值没意义。') }}
             </p>
           </div>
         </template>
         <div v-else class="empty">
-          <p class="empty-title">取不到系统信息</p>
-          <p class="muted">{{ sysinfo?.reason ?? 'bot 当前不可达' }}</p>
+          <p class="empty-title">{{ t('取不到系统信息') }}</p>
+          <p class="muted">{{ !sysinfo || sysinfo.reason === null ? t('bot 当前不可达') : errorDetailText({ detail: sysinfo.reason, status: sysinfo.status }) }}</p>
         </div>
       </div>
 
       <div class="card panel">
-        <h2 class="panel-title">运行配置</h2>
+        <h2 class="panel-title">{{ t('运行配置') }}</h2>
         <template v-if="config && config.available === 'ok' && config.config">
           <div v-for="g in configGroups(config.config)" :key="g.title" class="group">
-            <h3 class="group-title">{{ g.title }}</h3>
+            <h3 class="group-title">{{ t(g.title) }}</h3>
             <div v-for="row in g.rows" :key="row.key" class="kvrow">
               <span class="k mono">{{ row.key }}</span>
               <span class="v num">{{ display(row.value) }}</span>
@@ -367,8 +377,8 @@ watch(tab, () => void loadTab())
           </div>
         </template>
         <div v-else class="empty">
-          <p class="empty-title">取不到配置</p>
-          <p class="muted">{{ config?.reason ?? 'bot 当前不可达' }}</p>
+          <p class="empty-title">{{ t('取不到配置') }}</p>
+          <p class="muted">{{ !config || config.reason === null ? t('bot 当前不可达') : errorDetailText({ detail: config.reason, status: config.status }) }}</p>
         </div>
       </div>
     </section>
@@ -376,22 +386,22 @@ watch(tab, () => void loadTab())
     <!-- 策略 -->
     <section v-show="tab === 'strategy'" class="card panel fade-up">
       <h2 class="panel-title">
-        策略参数
+        {{ t('策略参数') }}
         <span v-if="strategy?.strategy" class="tag">{{ strategy.strategy }}</span>
       </h2>
       <template v-if="strategy && strategy.available === 'ok' && strategy.info">
         <p class="muted small">
-          时间框架 <strong class="mono">{{ strategy.info.timeframe ?? '—' }}</strong>
-          · 可优化参数 {{ strategy.info.params?.length ?? 0 }} 项
+          {{ t('时间框架') }} <strong class="mono">{{ strategy.info.timeframe ?? '—' }}</strong>
+          {{ t('· 可优化参数 {n} 项', { n: strategy.info.params?.length ?? 0 }) }}
         </p>
         <table v-if="strategy.info.params?.length" class="tbl">
           <thead>
             <tr>
-              <th>参数</th>
-              <th class="right">当前值</th>
-              <th>类型</th>
-              <th>空间</th>
-              <th class="right">范围</th>
+              <th>{{ t('参数') }}</th>
+              <th class="right">{{ t('当前值') }}</th>
+              <th>{{ t('类型') }}</th>
+              <th>{{ t('空间') }}</th>
+              <th class="right">{{ t('范围') }}</th>
             </tr>
           </thead>
           <tbody>
@@ -406,23 +416,23 @@ watch(tab, () => void loadTab())
             </tr>
           </tbody>
         </table>
-        <p v-else class="muted small">该策略没有声明可优化参数。</p>
+        <p v-else class="muted small">{{ t('该策略没有声明可优化参数。') }}</p>
         <p class="muted small note">
-          这里列的是 `IntParameter` / `DecimalParameter` 这类可优化参数，不是策略的全部类属性。
+          {{ t('这里列的是 `IntParameter` / `DecimalParameter` 这类可优化参数，不是策略的全部类属性。') }}
         </p>
       </template>
       <div v-else class="empty">
-        <p class="empty-title">取不到策略参数</p>
-        <p class="muted">{{ strategy?.reason ?? 'bot 可能还没加载完策略' }}</p>
-        <p class="muted small">上游只在 running / paused 状态下返回策略信息。</p>
+        <p class="empty-title">{{ t('取不到策略参数') }}</p>
+        <p class="muted">{{ !strategy || strategy.reason === null ? t('bot 可能还没加载完策略') : errorDetailText({ detail: strategy.reason, status: strategy.status }) }}</p>
+        <p class="muted small">{{ t('上游只在 running / paused 状态下返回策略信息。') }}</p>
       </div>
     </section>
     <!-- 选币 -->
     <section v-show="tab === 'pairlist'" class="grid fade-up">
       <div class="card panel">
         <h2 class="panel-title">
-          白名单
-          <span class="tag">{{ pairlist?.whitelist.length ?? 0 }} 个</span>
+          {{ t('白名单') }}
+          <span class="tag">{{ t('{n} 个', { n: pairlist?.whitelist.length ?? 0 }) }}</span>
         </h2>
         <template v-if="pairlist">
           <div v-if="pairlist.whitelist_method.length" class="chain">
@@ -434,33 +444,33 @@ watch(tab, () => void loadTab())
           <div v-if="pairlist.whitelist.length" class="chips">
             <span v-for="p in pairlist.whitelist" :key="p" class="pchtag mono">{{ p }}</span>
           </div>
-          <p v-else class="muted small">本轮还没有选出交易对（选币可能尚未跑完，或过滤后为空）。</p>
+          <p v-else class="muted small">{{ t('本轮还没有选出交易对（选币可能尚未跑完，或过滤后为空）。') }}</p>
           <p class="muted small note">
-            这是<strong>本轮</strong>的选币结果，动态选币每轮都可能换批；上面的链路就是 config 里的 pairlist 顺序。
+            {{ t('这是') }}<strong>{{ t('本轮') }}</strong>{{ t('的选币结果，动态选币每轮都可能换批；上面的链路就是 config 里的 pairlist 顺序。') }}
           </p>
         </template>
         <div v-else class="empty">
-          <p class="empty-title">取不到白名单</p>
-          <p class="muted">{{ pairlistReason ?? 'bot 当前不可达' }}</p>
+          <p class="empty-title">{{ t('取不到白名单') }}</p>
+          <p class="muted">{{ pairlistReason === null ? t('bot 当前不可达') : errorDetailText(pairlistReason) }}</p>
         </div>
       </div>
 
       <div class="card panel">
-        <h2 class="panel-title">黑名单与临时锁定</h2>
+        <h2 class="panel-title">{{ t('黑名单与临时锁定') }}</h2>
         <template v-if="pairlist">
-          <h3 class="group-title">黑名单规则（正则，不是具体币对）</h3>
+          <h3 class="group-title">{{ t('黑名单规则（正则，不是具体币对）') }}</h3>
           <div v-for="b in pairlist.blacklist" :key="b" class="kvrow">
             <span class="k mono">{{ b }}</span>
           </div>
-          <p v-if="!pairlist.blacklist.length" class="muted small">没有黑名单规则。</p>
+          <p v-if="!pairlist.blacklist.length" class="muted small">{{ t('没有黑名单规则。') }}</p>
           <p class="muted small">
-            展开后命中 {{ pairlist.blacklist_expanded.length }} 个交易对。
+            {{ t('展开后命中 {n} 个交易对。', { n: pairlist.blacklist_expanded.length }) }}
           </p>
 
-          <h3 class="group-title spaced">临时锁定</h3>
+          <h3 class="group-title spaced">{{ t('临时锁定') }}</h3>
           <table v-if="pairlist.locks.length" class="tbl">
             <thead>
-              <tr><th>pair</th><th>方向</th><th>原因</th><th class="right">到期</th></tr>
+              <tr><th>pair</th><th>{{ t('方向') }}</th><th>{{ t('原因') }}</th><th class="right">{{ t('到期') }}</th></tr>
             </thead>
             <tbody>
               <tr v-for="l in pairlist.locks" :key="l.id">
@@ -471,14 +481,14 @@ watch(tab, () => void loadTab())
               </tr>
             </tbody>
           </table>
-          <p v-else class="muted small">当前没有被锁定的交易对。</p>
+          <p v-else class="muted small">{{ t('当前没有被锁定的交易对。') }}</p>
           <p class="muted small note">
-            锁定有到期时间，到点自动释放；它不是黑名单，别当成"永久不能交易"。
+            {{ t('锁定有到期时间，到点自动释放；它不是黑名单，别当成"永久不能交易"。') }}
           </p>
         </template>
         <div v-else class="empty">
-          <p class="empty-title">取不到屏蔽信息</p>
-          <p class="muted">{{ pairlistReason ?? 'bot 当前不可达' }}</p>
+          <p class="empty-title">{{ t('取不到屏蔽信息') }}</p>
+          <p class="muted">{{ pairlistReason === null ? t('bot 当前不可达') : errorDetailText(pairlistReason) }}</p>
         </div>
       </div>
     </section>

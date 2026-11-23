@@ -14,6 +14,7 @@
  * 在重启过程中挂着一条红字，会被读成「这次也失败了」。
  */
 
+import { t } from '../i18n'
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useAppMode } from '../composables/useAppMode'
 
@@ -125,12 +126,12 @@ function copyByTextarea(value: string): void {
         </svg>
       </span>
       <div class="titles">
-        <p class="title">后端报告的错误</p>
-        <p class="sub">这是 freqtrade 返回的原文，未做任何改写；需要排查时请完整复制。</p>
+        <p class="title">{{ t('后端报告的错误') }}</p>
+        <p class="sub">{{ t('这是 freqtrade 返回的原文，未做任何改写；需要排查时请完整复制。') }}</p>
       </div>
       <div class="head-actions">
         <button class="btn btn-secondary btn-sm" type="button" @click="copy">
-          {{ copied ? '已复制' : '复制原文' }}
+          {{ copied ? t('已复制') : t('复制原文') }}
         </button>
         <button
           v-if="overflowing"
@@ -139,7 +140,7 @@ function copyByTextarea(value: string): void {
           :aria-expanded="expanded"
           @click="expanded = !expanded"
         >
-          {{ expanded ? '收起' : '展开全部' }}
+          {{ expanded ? t('收起') : t('展开全部') }}
         </button>
       </div>
     </div>
@@ -148,11 +149,11 @@ function copyByTextarea(value: string): void {
 
     <div class="foot">
       <button class="btn btn-secondary btn-sm" type="button" @click="emit('retry')">
-        {{ props.retryLabel ?? '重试' }}
+        {{ props.retryLabel ?? t('重试') }}
       </button>
-      <button class="btn btn-secondary btn-sm" type="button" @click="emit('goConfig')">去配置</button>
-      <button class="btn btn-secondary btn-sm" type="button" @click="emit('goOps')">看日志</button>
-      <span class="hint">改完配置后需要重新切换模式才会生效。</span>
+      <button class="btn btn-secondary btn-sm" type="button" @click="emit('goConfig')">{{ t('去配置') }}</button>
+      <button class="btn btn-secondary btn-sm" type="button" @click="emit('goOps')">{{ t('看日志') }}</button>
+      <span class="hint">{{ t('改完配置后需要重新切换模式才会生效。') }}</span>
     </div>
   </section>
 </template>
